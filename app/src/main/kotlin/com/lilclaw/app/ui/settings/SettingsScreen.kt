@@ -70,6 +70,7 @@ fun SettingsScreen(
                         val (statusColor, statusText) = when (state.gatewayState) {
                             is GatewayState.Running -> MaterialTheme.colorScheme.primary to "Running"
                             is GatewayState.Starting -> MaterialTheme.colorScheme.tertiary to "Starting..."
+                            is GatewayState.Downloading -> MaterialTheme.colorScheme.tertiary to "Downloading..."
                             is GatewayState.Extracting -> MaterialTheme.colorScheme.tertiary to "Extracting..."
                             is GatewayState.Stopped -> MaterialTheme.colorScheme.onSurfaceVariant to "Stopped"
                             is GatewayState.Error -> MaterialTheme.colorScheme.error to "Error"

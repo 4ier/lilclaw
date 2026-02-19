@@ -15,6 +15,7 @@
     <application
         android:name=".LilClawApp"
         android:allowBackup="true"
+        android:usesCleartextTraffic="true"
         android:label="LilClaw"
         android:supportsRtl="true"
         android:theme="@style/Theme.LilClaw">

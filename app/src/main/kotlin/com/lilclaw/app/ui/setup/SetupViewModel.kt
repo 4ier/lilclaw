@@ -18,6 +18,7 @@ data class SetupState(
     val isTestingConnection: Boolean = false,
     val connectionError: String? = null,
     val extractionProgress: Float = 0f,
+    val isDownloading: Boolean = false,
 )
 
 enum class SetupStep { WELCOME, EXTRACT, PROVIDER, DONE }
@@ -39,6 +40,13 @@ class SetupViewModel(
         viewModelScope.launch {
             gatewayManager.extractionProgress.collect { progress ->
                 _state.update { it.copy(extractionProgress = progress) }
+            }
+        }
+        viewModelScope.launch {
+            gatewayManager.state.collect { gwState ->
+                _state.update {
+                    it.copy(isDownloading = gwState is GatewayState.Downloading)
+                }
             }
         }
     }

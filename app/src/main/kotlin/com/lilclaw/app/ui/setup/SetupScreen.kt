@@ -60,7 +60,10 @@ fun SetupScreen(
             AnimatedContent(targetState = state.step, label = "setup_step") { step ->
                 when (step) {
                     SetupStep.WELCOME -> WelcomeStep(onNext = viewModel::onNextFromWelcome)
-                    SetupStep.EXTRACT -> ExtractStep(progress = state.extractionProgress)
+                    SetupStep.EXTRACT -> ExtractStep(
+                        progress = state.extractionProgress,
+                        isDownloading = state.isDownloading,
+                    )
                     SetupStep.PROVIDER -> ProviderStep(
                         state = state,
                         onProviderChanged = viewModel::onProviderChanged,
@@ -112,15 +115,21 @@ private fun WelcomeStep(onNext: () -> Unit) {
 }
 
 @Composable
-private fun ExtractStep(progress: Float) {
+private fun ExtractStep(progress: Float, isDownloading: Boolean) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = Modifier.fillMaxSize(),
     ) {
         Text(
-            text = "Setting up environment...",
+            text = if (isDownloading) "Downloading environment..." else "Extracting environment...",
             style = MaterialTheme.typography.titleLarge,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = if (isDownloading) "~57 MB — one-time download" else "Preparing Alpine Linux + Node.js",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
         LinearProgressIndicator(

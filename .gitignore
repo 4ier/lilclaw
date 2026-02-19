@@ -18,3 +18,8 @@ android-design-guidelines/
 app/build/
 build/
 .gradle/
+
+# Rootfs build artifacts
+rootfs-build/rootfs/
+rootfs-build/staging*/
+rootfs-build/*.tar.gz
