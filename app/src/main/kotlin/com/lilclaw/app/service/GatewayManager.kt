@@ -254,6 +254,7 @@ class GatewayManager(private val context: Context) {
                     "/usr/local/bin/openclaw",
                     "gateway", "run", "--dev",
                     "--port", port.toString(),
+                    "--token", "lilclaw-local",
                 )
 
                 Log.i(TAG, "Starting gateway: ${cmd.joinToString(" ")}")
@@ -267,24 +268,34 @@ class GatewayManager(private val context: Context) {
 
                 gatewayProcess = processBuilder.start()
 
-                // Log gateway output in background
+                // Log gateway output in background and detect when it's listening
+                var isListening = false
                 scope.launch {
                     gatewayProcess?.inputStream?.bufferedReader()?.use { reader ->
                         reader.lineSequence().forEach { line ->
                             Log.d(TAG, "[gateway] $line")
+                            if (!isListening && line.contains("listening on ws://")) {
+                                isListening = true
+                                _state.value = GatewayState.Running
+                                Log.i(TAG, "Gateway is listening on port $port")
+                            }
                         }
                     }
                 }
 
                 // Wait for startup, then check if process is alive
-                delay(3000)
-                if (gatewayProcess?.isAlive == true) {
+                delay(30000)
+                if (!isListening && gatewayProcess?.isAlive == true) {
+                    // Process alive but not listening yet — still set Running as fallback
                     _state.value = GatewayState.Running
-                    Log.i(TAG, "Gateway is running on port $port")
+                    Log.i(TAG, "Gateway is running on port $port (fallback)")
                     monitorProcess()
-                } else {
+                } else if (gatewayProcess?.isAlive != true) {
                     val exitCode = gatewayProcess?.exitValue() ?: -1
                     _state.value = GatewayState.Error("Gateway exited with code $exitCode")
+                } else {
+                    // Already listening
+                    monitorProcess()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Start failed", e)
