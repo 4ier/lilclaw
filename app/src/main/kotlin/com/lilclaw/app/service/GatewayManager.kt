@@ -31,7 +31,7 @@ class GatewayManager(private val context: Context) {
     companion object {
         private const val TAG = "GatewayManager"
         private const val ROOTFS_URL =
-            "https://github.com/4ier/lilclaw/releases/download/v0.1.0/rootfs-arm64.tar.gz"
+            "https://github.com/4ier/lilclaw/releases/download/v0.2.0/rootfs-v0.2.0.tar.gz"
         private const val ROOTFS_SIZE_BYTES = 57_000_000L // ~57MB for progress calculation
     }
 
