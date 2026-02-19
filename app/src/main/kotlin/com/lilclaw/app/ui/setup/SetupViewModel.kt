@@ -87,7 +87,11 @@ class SetupViewModel(
         viewModelScope.launch {
             val s = _state.value
             settings.completeSetup(s.provider, s.apiKey, s.model)
-            gatewayManager.start()
+            gatewayManager.start(
+                provider = s.provider,
+                apiKey = s.apiKey,
+                model = s.model,
+            )
             _state.update { it.copy(step = SetupStep.DONE) }
         }
     }

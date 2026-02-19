@@ -57,6 +57,9 @@ class GatewayManager(private val context: Context) {
     private val tallocLib: File
         get() = File(nativeLibDir, "libtalloc.so")
 
+    private val prootLoaderBin: File
+        get() = File(nativeLibDir, "libproot_loader.so")
+
     val isRootfsExtracted: Boolean
         get() = rootfsDir.exists() && File(rootfsDir, "usr/bin/node").exists()
 
@@ -196,7 +199,7 @@ class GatewayManager(private val context: Context) {
         Log.i(TAG, "Extraction complete")
     }
 
-    fun start(port: Int = 3000) {
+    fun start(port: Int = 3000, provider: String = "", apiKey: String = "", model: String = "") {
         if (_state.value == GatewayState.Running) return
         scope.launch {
             _state.value = GatewayState.Starting
@@ -208,14 +211,31 @@ class GatewayManager(private val context: Context) {
                     throw RuntimeException("Rootfs not extracted")
                 }
 
+                // Write OpenClaw config.yaml into rootfs (skip if already exists and no new values)
+                if (provider.isNotEmpty() && apiKey.isNotEmpty()) {
+                    writeGatewayConfig(port, provider, apiKey, model)
+                } else {
+                    val existingConfig = File(rootfsDir, "root/.config/openclaw/config.yaml")
+                    if (!existingConfig.exists()) {
+                        Log.w(TAG, "No config.yaml and no provider/apiKey — gateway may fail")
+                    }
+                }
+
+                // Setup lib directory with correctly-named libtalloc
+                setupLibDir()
+
+                // Make rootfs binaries executable (Android extracts without +x)
+                makeRootfsExecutable()
+
                 // Ensure proot is executable
                 prootBin.setExecutable(true)
 
                 val env = mutableMapOf(
                     "HOME" to "/root",
-                    "PATH" to "/root/.npm-global/bin:/usr/local/bin:/usr/bin:/bin",
+                    "PATH" to "/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin",
                     "PROOT_TMP_DIR" to context.cacheDir.absolutePath,
-                    "LD_LIBRARY_PATH" to nativeLibDir.absolutePath,
+                    "PROOT_LOADER" to prootLoaderBin.absolutePath,
+                    "LD_LIBRARY_PATH" to "${libDir.absolutePath}:${nativeLibDir.absolutePath}",
                 )
 
                 val cmd = listOf(
@@ -229,10 +249,10 @@ class GatewayManager(private val context: Context) {
                     "-w", "/root",
                     "/usr/bin/env",
                     "HOME=/root",
-                    "PATH=/root/.npm-global/bin:/usr/local/bin:/usr/bin:/bin",
+                    "PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin",
                     "node",
-                    "/root/.npm-global/bin/openclaw",
-                    "gateway", "start", "--foreground",
+                    "/usr/local/bin/openclaw",
+                    "gateway", "run", "--dev",
                     "--port", port.toString(),
                 )
 
@@ -288,12 +308,105 @@ class GatewayManager(private val context: Context) {
         _state.value = GatewayState.Stopped
     }
 
-    fun restart(port: Int = 3000) {
+    fun restart(port: Int = 3000, provider: String = "", apiKey: String = "", model: String = "") {
         stop()
         scope.launch {
             delay(1000)
-            start(port)
+            start(port, provider, apiKey, model)
         }
+    }
+
+    private fun writeGatewayConfig(port: Int, provider: String, apiKey: String, model: String) {
+        val configDir = File(rootfsDir, "root/.config/openclaw")
+        configDir.mkdirs()
+        val configFile = File(configDir, "config.yaml")
+
+        // Map UI provider names to OpenClaw provider format
+        val providerSlug = when (provider.lowercase()) {
+            "openai" -> "openai"
+            "anthropic" -> "anthropic"
+            "aws bedrock" -> "amazon-bedrock"
+            else -> provider.lowercase()
+        }
+
+        val defaultModel = when (providerSlug) {
+            "openai" -> "gpt-4o"
+            "anthropic" -> "claude-sonnet-4-20250514"
+            "amazon-bedrock" -> "anthropic.claude-sonnet-4-20250514-v1:0"
+            else -> "gpt-4o"
+        }
+
+        val effectiveModel = model.ifBlank { defaultModel }
+
+        val config = buildString {
+            appendLine("# LilClaw auto-generated config")
+            appendLine("agents:")
+            appendLine("  defaults:")
+            appendLine("    model: \"$providerSlug/$effectiveModel\"")
+            appendLine()
+            appendLine("gateway:")
+            appendLine("  port: $port")
+            appendLine("  auth:")
+            appendLine("    token: \"lilclaw-local\"")
+            appendLine()
+            // API key as environment-style config
+            when (providerSlug) {
+                "openai" -> {
+                    appendLine("providers:")
+                    appendLine("  openai:")
+                    appendLine("    apiKey: \"$apiKey\"")
+                }
+                "anthropic" -> {
+                    appendLine("providers:")
+                    appendLine("  anthropic:")
+                    appendLine("    apiKey: \"$apiKey\"")
+                }
+                "amazon-bedrock" -> {
+                    // AWS uses env vars, write to profile
+                    appendLine("# AWS credentials should be set via environment")
+                }
+            }
+        }
+
+        configFile.writeText(config)
+        Log.i(TAG, "Wrote gateway config to ${configFile.absolutePath}")
+    }
+
+    private val libDir: File
+        get() = File(context.filesDir, "lib")
+
+    private fun setupLibDir() {
+        // Android extracts native libs without version suffixes,
+        // but proot needs libtalloc.so.2
+        libDir.mkdirs()
+        val target = File(libDir, "libtalloc.so.2")
+        if (!target.exists()) {
+            tallocLib.copyTo(target, overwrite = true)
+            target.setReadable(true)
+            Log.i(TAG, "Copied libtalloc.so.2 to ${target.absolutePath}")
+        }
+    }
+
+    private fun makeRootfsExecutable() {
+        // tar extraction on Android may strip execute bits.
+        // Restore them for key binaries.
+        val binaries = listOf(
+            "bin/busybox", "bin/sh",
+            "usr/bin/node",
+            "usr/lib/libgcc_s.so.1", "usr/lib/libstdc++.so.6",
+            "lib/ld-musl-aarch64.so.1",
+        )
+        for (bin in binaries) {
+            val f = File(rootfsDir, bin)
+            if (f.exists()) f.setExecutable(true, false)
+        }
+        // Also chmod all of /usr/bin and /bin
+        File(rootfsDir, "bin").listFiles()?.forEach { it.setExecutable(true, false) }
+        File(rootfsDir, "usr/bin").listFiles()?.forEach { it.setExecutable(true, false) }
+        File(rootfsDir, "usr/lib").listFiles()?.filter { it.name.endsWith(".so") || it.name.contains(".so.") }
+            ?.forEach { it.setReadable(true); it.setExecutable(true, false) }
+        File(rootfsDir, "lib").listFiles()?.forEach { it.setExecutable(true, false) }
+        Log.i(TAG, "Made rootfs binaries executable")
     }
 
     private fun monitorProcess() {

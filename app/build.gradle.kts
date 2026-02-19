@@ -11,12 +11,19 @@ android {
     defaultConfig {
         applicationId = "com.lilclaw.app"
         minSdk = 26
-        targetSdk = 35
+        //noinspection OldTargetApi — targetSdk 28 required for proot execve (W^X exemption)
+        targetSdk = 28
         versionCode = 1
         versionName = "0.1.0"
 
         ndk {
             abiFilters += listOf("arm64-v8a")
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true // Extract native libs to filesystem
         }
     }
 
