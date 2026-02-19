@@ -300,56 +300,46 @@ class GatewayClient {
 
     private fun handleChatEvent(json: JSONObject) {
         val payload = json.optJSONObject("payload") ?: return
-        val kind = payload.optString("kind", "")
+        val state = payload.optString("state", "")
+        val message = payload.optJSONObject("message") ?: return
 
-        when (kind) {
-            // Assistant message (complete or chunk)
-            "message" -> {
-                val role = payload.optString("role", "assistant")
-                val content = payload.optString("content", "")
-                val messageId = payload.optString("id", UUID.randomUUID().toString())
+        val role = message.optString("role", "assistant")
+        // Content is an array: [{type:"text", text:"..."}]
+        val contentArray = message.optJSONArray("content")
+        val text = if (contentArray != null) {
+            val parts = mutableListOf<String>()
+            for (i in 0 until contentArray.length()) {
+                val part = contentArray.getJSONObject(i)
+                if (part.optString("type") == "text") {
+                    parts.add(part.optString("text", ""))
+                }
+            }
+            parts.joinToString("")
+        } else {
+            message.optString("content", "")
+        }
 
-                if (content.isNotBlank()) {
-                    scope.launch {
-                        _messages.emit(
-                            ChatMessage(
-                                id = messageId,
-                                role = role,
-                                content = content,
-                            )
-                        )
-                    }
-                    // Clear streaming state
-                    streamBuffer.clear()
-                    _streamingContent.value = null
+        when (state) {
+            "delta" -> {
+                // Streaming delta — update streaming content
+                if (text.isNotEmpty()) {
+                    _streamingContent.value = text
                 }
             }
 
-            // Streaming chunk
-            "chunk", "delta" -> {
-                val content = payload.optString("content", "")
-                    .ifBlank { payload.optString("delta", "") }
-                if (content.isNotEmpty()) {
-                    streamBuffer.append(content)
-                    _streamingContent.value = streamBuffer.toString()
-                }
-            }
-
-            // Stream complete
-            "done", "end", "complete" -> {
-                val finalContent = streamBuffer.toString()
-                if (finalContent.isNotBlank()) {
+            "final" -> {
+                // Final complete message
+                if (text.isNotBlank()) {
                     scope.launch {
                         _messages.emit(
                             ChatMessage(
                                 id = UUID.randomUUID().toString(),
-                                role = "assistant",
-                                content = finalContent,
+                                role = role,
+                                content = text,
                             )
                         )
                     }
                 }
-                streamBuffer.clear()
                 _streamingContent.value = null
                 activeRunId = null
             }

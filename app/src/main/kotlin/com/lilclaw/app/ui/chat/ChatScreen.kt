@@ -1,5 +1,6 @@
 package com.lilclaw.app.ui.chat
 
+import android.widget.EditText
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,7 +24,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -31,11 +31,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.lilclaw.app.data.ChatMessage
 import org.koin.androidx.compose.koinViewModel
 
@@ -48,6 +53,7 @@ fun ChatScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
+    var editTextRef by remember { mutableStateOf<EditText?>(null) }
 
     LaunchedEffect(topicId) { viewModel.setTopic(topicId) }
 
@@ -116,32 +122,50 @@ fun ChatScreen(
                 item { Spacer(Modifier.height(8.dp)) }
             }
 
-            // Input bar
+            // Input bar — using Android EditText for reliable IME support
+            val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
+            val hintColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedTextField(
-                    value = state.inputText,
-                    onValueChange = viewModel::onInputChanged,
-                    placeholder = { Text("Message...") },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(24.dp),
-                    maxLines = 4,
+                AndroidView(
+                    factory = { context ->
+                        EditText(context).apply {
+                            hint = "Message..."
+                            setHintTextColor(hintColor)
+                            setTextColor(textColor)
+                            textSize = 16f
+                            background = null
+                            maxLines = 4
+                            isSingleLine = false
+                            setPadding(48, 24, 48, 24)
+                            editTextRef = this
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
                 )
+
                 IconButton(
-                    onClick = viewModel::onSend,
-                    enabled = state.inputText.isNotBlank(),
+                    onClick = {
+                        val text = editTextRef?.text?.toString()?.trim() ?: ""
+                        if (text.isNotEmpty()) {
+                            viewModel.onSendText(text)
+                            editTextRef?.setText("")
+                        }
+                    },
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Send,
                         contentDescription = "Send",
-                        tint = if (state.inputText.isNotBlank())
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             }

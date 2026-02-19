@@ -54,6 +54,14 @@ class ChatViewModel(
         }
     }
 
+    fun onSendText(text: String) {
+        if (text.isBlank()) return
+        messageRepo.sendMessage(text, currentTopicId)
+        _state.update {
+            it.copy(messages = messageRepo.getMessages(currentTopicId))
+        }
+    }
+
     fun onInputChanged(text: String) {
         _state.update { it.copy(inputText = text) }
     }
