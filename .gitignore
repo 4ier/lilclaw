@@ -23,3 +23,11 @@ build/
 rootfs-build/rootfs/
 rootfs-build/staging*/
 rootfs-build/*.tar.gz
+
+# Web
+web/node_modules/
+web/dist/
+web/tsconfig.tsbuildinfo
+
+# Monorepo root
+node_modules/

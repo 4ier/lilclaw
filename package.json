@@ -1,0 +1,5 @@
+{
+  "name": "lilclaw",
+  "private": true,
+  "workspaces": ["web"]
+}
