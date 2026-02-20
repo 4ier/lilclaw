@@ -19,6 +19,7 @@ data class SetupState(
     val connectionError: String? = null,
     val extractionProgress: Float = 0f,
     val isDownloading: Boolean = false,
+    val extractionError: String? = null,
 )
 
 enum class SetupStep { WELCOME, EXTRACT, PROVIDER, DONE }
@@ -45,7 +46,10 @@ class SetupViewModel(
         viewModelScope.launch {
             gatewayManager.state.collect { gwState ->
                 _state.update {
-                    it.copy(isDownloading = gwState is GatewayState.Downloading)
+                    it.copy(
+                        isDownloading = gwState is GatewayState.Downloading,
+                        extractionError = if (gwState is GatewayState.Error) gwState.message else null,
+                    )
                 }
             }
         }
@@ -55,10 +59,17 @@ class SetupViewModel(
         if (gatewayManager.isRootfsExtracted) {
             _state.update { it.copy(step = SetupStep.PROVIDER) }
         } else {
-            _state.update { it.copy(step = SetupStep.EXTRACT) }
+            _state.update { it.copy(step = SetupStep.EXTRACT, extractionError = null) }
             gatewayManager.extractRootfs {
                 _state.update { it.copy(step = SetupStep.PROVIDER) }
             }
+        }
+    }
+
+    fun onRetryExtraction() {
+        _state.update { it.copy(extractionError = null, extractionProgress = 0f) }
+        gatewayManager.extractRootfs {
+            _state.update { it.copy(step = SetupStep.PROVIDER) }
         }
     }
 

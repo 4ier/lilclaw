@@ -32,7 +32,7 @@ class GatewayManager(private val context: Context) {
         private const val TAG = "GatewayManager"
         private const val ROOTFS_URL =
             "https://github.com/4ier/lilclaw/releases/download/v0.2.0/rootfs-v0.2.0.tar.gz"
-        private const val ROOTFS_SIZE_BYTES = 57_000_000L // ~57MB for progress calculation
+        private const val ROOTFS_SIZE_BYTES = 290_000_000L // ~290MB for progress calculation
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -124,7 +124,7 @@ class GatewayManager(private val context: Context) {
             while (redirectCount < 5) {
                 connection = url.openConnection() as HttpURLConnection
                 connection.connectTimeout = 30_000
-                connection.readTimeout = 60_000
+                connection.readTimeout = 300_000  // 5 min for large file
                 connection.instanceFollowRedirects = false
                 val code = connection.responseCode
                 if (code in 301..302 || code == 307 || code == 308) {

@@ -63,6 +63,8 @@ fun SetupScreen(
                     SetupStep.EXTRACT -> ExtractStep(
                         progress = state.extractionProgress,
                         isDownloading = state.isDownloading,
+                        error = state.extractionError,
+                        onRetry = viewModel::onRetryExtraction,
                     )
                     SetupStep.PROVIDER -> ProviderStep(
                         state = state,
@@ -115,33 +117,52 @@ private fun WelcomeStep(onNext: () -> Unit) {
 }
 
 @Composable
-private fun ExtractStep(progress: Float, isDownloading: Boolean) {
+private fun ExtractStep(progress: Float, isDownloading: Boolean, error: String? = null, onRetry: () -> Unit = {}) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = Modifier.fillMaxSize(),
     ) {
-        Text(
-            text = if (isDownloading) "Downloading environment..." else "Extracting environment...",
-            style = MaterialTheme.typography.titleLarge,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = if (isDownloading) "~57 MB — one-time download" else "Preparing Alpine Linux + Node.js",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(24.dp))
-        LinearProgressIndicator(
-            progress = { progress },
-            modifier = Modifier.fillMaxWidth(0.8f),
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "${(progress * 100).toInt()}%",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (error != null) {
+            Text(
+                text = "Setup failed",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(24.dp))
+            Button(onClick = onRetry, modifier = Modifier.fillMaxWidth(0.6f)) {
+                Text("Retry")
+            }
+        } else {
+            Text(
+                text = if (isDownloading) "Downloading environment..." else "Extracting environment...",
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = if (isDownloading) "~290 MB — one-time download" else "Preparing Alpine Linux + Node.js",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(24.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth(0.8f),
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "${(progress * 100).toInt()}%",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
