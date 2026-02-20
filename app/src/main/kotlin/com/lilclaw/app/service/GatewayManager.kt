@@ -230,31 +230,23 @@ class GatewayManager(private val context: Context) {
                 // Ensure proot is executable
                 prootBin.setExecutable(true)
 
-                val env = mutableMapOf(
-                    "HOME" to "/root",
-                    "PATH" to "/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin",
-                    "PROOT_TMP_DIR" to context.cacheDir.absolutePath,
-                    "PROOT_LOADER" to prootLoaderBin.absolutePath,
-                    "LD_LIBRARY_PATH" to "${libDir.absolutePath}:${nativeLibDir.absolutePath}",
-                )
-
                 val cmd = listOf(
-                    prootBin.absolutePath,
-                    "--link2symlink",
-                    "-0",
-                    "-r", rootfsDir.absolutePath,
-                    "-b", "/dev",
-                    "-b", "/proc",
-                    "-b", "/sys",
-                    "-w", "/root",
-                    "/usr/bin/env",
-                    "HOME=/root",
-                    "PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin",
-                    "node",
-                    "/usr/local/bin/openclaw",
-                    "gateway", "run", "--dev",
-                    "--port", port.toString(),
-                    "--token", "lilclaw-local",
+                    "sh", "-c",
+                    buildString {
+                        append("export LD_LIBRARY_PATH=${libDir.absolutePath}:${nativeLibDir.absolutePath} && ")
+                        append("export PROOT_TMP_DIR=${context.cacheDir.absolutePath} && ")
+                        append("export PROOT_LOADER=${prootLoaderBin.absolutePath} && ")
+                        append("exec ${prootBin.absolutePath}")
+                        append(" --link2symlink -0")
+                        append(" -r ${rootfsDir.absolutePath}")
+                        append(" -b /dev -b /proc -b /sys")
+                        append(" -w /root")
+                        append(" /usr/bin/env HOME=/root PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin")
+                        append(" node /usr/local/bin/openclaw")
+                        append(" gateway run --dev")
+                        append(" --port $port")
+                        append(" --token lilclaw-local")
+                    }
                 )
 
                 Log.i(TAG, "Starting gateway: ${cmd.joinToString(" ")}")
@@ -262,9 +254,6 @@ class GatewayManager(private val context: Context) {
                 val processBuilder = ProcessBuilder(cmd)
                     .directory(rootfsDir)
                     .redirectErrorStream(true)
-
-                // Set LD_LIBRARY_PATH so proot can find libtalloc
-                processBuilder.environment().putAll(env)
 
                 gatewayProcess = processBuilder.start()
 
@@ -388,13 +377,32 @@ class GatewayManager(private val context: Context) {
 
     private fun setupLibDir() {
         // Android extracts native libs without version suffixes,
-        // but proot needs libtalloc.so.2
+        // but proot needs libtalloc.so.2.
+        // LD_LIBRARY_PATH doesn't work reliably on Android 7+ due to
+        // namespace-based linking. Place the lib in multiple locations:
+        // 1. files/lib/ (for LD_LIBRARY_PATH fallback)
+        // 2. Same directory as proot binary (nativeLibDir)
+        // 3. rootfs /usr/lib/ (accessible inside proot)
         libDir.mkdirs()
-        val target = File(libDir, "libtalloc.so.2")
-        if (!target.exists()) {
-            tallocLib.copyTo(target, overwrite = true)
-            target.setReadable(true)
-            Log.i(TAG, "Copied libtalloc.so.2 to ${target.absolutePath}")
+
+        val targets = listOf(
+            File(libDir, "libtalloc.so.2"),
+            File(nativeLibDir, "libtalloc.so.2"),
+            File(rootfsDir, "usr/lib/libtalloc.so.2"),
+        )
+
+        for (target in targets) {
+            try {
+                if (!target.exists()) {
+                    target.parentFile?.mkdirs()
+                    tallocLib.copyTo(target, overwrite = true)
+                    target.setReadable(true)
+                    target.setExecutable(true, false)
+                    Log.i(TAG, "Copied libtalloc.so.2 to ${target.absolutePath}")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to copy libtalloc.so.2 to ${target.absolutePath}: ${e.message}")
+            }
         }
     }
 
