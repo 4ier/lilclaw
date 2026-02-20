@@ -3,6 +3,8 @@ package com.lilclaw.app.ui.setup
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,24 +13,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -39,7 +37,7 @@ import org.koin.androidx.compose.koinViewModel
 
 private val PROVIDERS = listOf("OpenAI", "Anthropic", "DeepSeek", "AWS Bedrock", "Custom")
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SetupScreen(
     onSetupComplete: () -> Unit,
@@ -261,7 +259,7 @@ private fun ExtractStep(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProviderStep(
     state: SetupState,
@@ -271,45 +269,44 @@ private fun ProviderStep(
     onTest: () -> Unit,
     onComplete: () -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
             text = "Configure Provider",
             style = MaterialTheme.typography.headlineMedium,
         )
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
 
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = it },
+        // Provider selection as chip-style buttons
+        Text(
+            text = "Provider",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
+
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedTextField(
-                value = state.provider.ifEmpty { "Select provider" },
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Provider") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
-            )
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                PROVIDERS.forEach { provider ->
-                    DropdownMenuItem(
-                        text = { Text(provider) },
-                        onClick = {
-                            onProviderChanged(provider)
-                            expanded = false
-                        },
-                    )
-                }
+            PROVIDERS.forEach { provider ->
+                val selected = state.provider == provider
+                FilterChip(
+                    selected = selected,
+                    onClick = { onProviderChanged(provider) },
+                    label = { Text(provider) },
+                )
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
 
         OutlinedTextField(
             value = state.apiKey,
