@@ -8,14 +8,13 @@ import com.lilclaw.app.data.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class SettingsState(
     val provider: String = "",
     val model: String = "",
     val apiKey: String = "",
-    val gatewayState: GatewayState = GatewayState.Stopped,
+    val gatewayState: GatewayState = GatewayState.Idle,
     val gatewayPort: Int = 3000,
 )
 
@@ -49,9 +48,16 @@ class SettingsViewModel(
 
     fun startGateway() {
         val s = _state.value
-        gatewayManager.start(s.gatewayPort, s.provider, s.apiKey, s.model)
+        gatewayManager.quickStart(
+            port = s.gatewayPort,
+            provider = s.provider,
+            apiKey = s.apiKey,
+            model = s.model,
+        )
     }
+
     fun stopGateway() = gatewayManager.stop()
+
     fun restartGateway() {
         val s = _state.value
         gatewayManager.restart(s.gatewayPort, s.provider, s.apiKey, s.model)

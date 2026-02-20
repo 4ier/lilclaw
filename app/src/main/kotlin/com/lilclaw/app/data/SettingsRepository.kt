@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -37,6 +38,11 @@ class SettingsRepository(private val context: Context) {
 
     val gatewayPort: Flow<Int> = context.dataStore.data
         .map { it[Keys.GATEWAY_PORT] ?: 3000 }
+
+    // Suspend one-shot getters for quick access
+    suspend fun providerValue(): String = provider.first()
+    suspend fun apiKeyValue(): String = apiKey.first()
+    suspend fun modelValue(): String = model.first()
 
     suspend fun completeSetup(provider: String, apiKey: String, model: String) {
         context.dataStore.edit { prefs ->

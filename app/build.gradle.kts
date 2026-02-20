@@ -13,8 +13,8 @@ android {
         minSdk = 26
         //noinspection OldTargetApi — targetSdk 28 required for proot execve (W^X exemption)
         targetSdk = 28
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 3
+        versionName = "0.3.0"
 
         ndk {
             abiFilters += listOf("arm64-v8a")
@@ -48,6 +48,11 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    // Don't compress rootfs tarballs in assets (we extract them ourselves)
+    androidResources {
+        noCompress += listOf("tar.gz")
     }
 }
 

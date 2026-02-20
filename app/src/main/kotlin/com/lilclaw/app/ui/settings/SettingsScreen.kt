@@ -8,17 +8,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -72,15 +71,17 @@ fun SettingsScreen(
                         val (statusColor, statusText) = when (state.gatewayState) {
                             is GatewayState.Running -> MaterialTheme.colorScheme.primary to "Running"
                             is GatewayState.Starting -> MaterialTheme.colorScheme.tertiary to "Starting..."
+                            is GatewayState.WaitingForUi -> MaterialTheme.colorScheme.tertiary to "Starting UI..."
+                            is GatewayState.Preparing -> MaterialTheme.colorScheme.tertiary to "Preparing..."
                             is GatewayState.Downloading -> MaterialTheme.colorScheme.tertiary to "Downloading..."
                             is GatewayState.Extracting -> MaterialTheme.colorScheme.tertiary to "Extracting..."
-                            is GatewayState.Stopped -> MaterialTheme.colorScheme.onSurfaceVariant to "Stopped"
+                            is GatewayState.Idle -> MaterialTheme.colorScheme.onSurfaceVariant to "Stopped"
                             is GatewayState.Error -> MaterialTheme.colorScheme.error to "Error"
                         }
                         Box(
                             modifier = Modifier
                                 .size(12.dp)
-                                .background(statusColor, shape = androidx.compose.foundation.shape.CircleShape),
+                                .background(statusColor, shape = CircleShape),
                         )
                         Text(
                             text = "  Gateway: $statusText",
@@ -90,32 +91,25 @@ fun SettingsScreen(
                     Spacer(Modifier.height(8.dp))
                     Text("Port: ${state.gatewayPort}", style = MaterialTheme.typography.bodyMedium)
                     if (state.gatewayState is GatewayState.Error) {
-                        androidx.compose.foundation.rememberScrollState().let { scrollState ->
-                            Text(
-                                (state.gatewayState as GatewayState.Error).message,
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier
-                                    .heightIn(max = 200.dp)
-                                    .verticalScroll(scrollState),
-                            )
-                        }
+                        val scrollState = rememberScrollState()
+                        Text(
+                            (state.gatewayState as GatewayState.Error).message,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier
+                                .heightIn(max = 200.dp)
+                                .verticalScroll(scrollState),
+                        )
                     }
                     Spacer(Modifier.height(16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         when (state.gatewayState) {
                             is GatewayState.Running -> {
-                                OutlinedButton(onClick = viewModel::stopGateway) {
-                                    Text("Stop")
-                                }
-                                Button(onClick = viewModel::restartGateway) {
-                                    Text("Restart")
-                                }
+                                OutlinedButton(onClick = viewModel::stopGateway) { Text("Stop") }
+                                Button(onClick = viewModel::restartGateway) { Text("Restart") }
                             }
-                            is GatewayState.Stopped, is GatewayState.Error -> {
-                                Button(onClick = viewModel::startGateway) {
-                                    Text("Start")
-                                }
+                            is GatewayState.Idle, is GatewayState.Error -> {
+                                Button(onClick = viewModel::startGateway) { Text("Start") }
                             }
                             else -> {}
                         }
@@ -128,8 +122,14 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Provider", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
-                    Text("Provider: ${state.provider.ifEmpty { "Not configured" }}", style = MaterialTheme.typography.bodyMedium)
-                    Text("Model: ${state.model.ifEmpty { "Default" }}", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Provider: ${state.provider.ifEmpty { "Not configured" }}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        "Model: ${state.model.ifEmpty { "Default" }}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
             }
 
@@ -138,8 +138,12 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("About", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
-                    Text("LilClaw (小爪子) v0.1.0", style = MaterialTheme.typography.bodyMedium)
-                    Text("Powered by OpenClaw", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("LilClaw (小爪子) v0.2.0", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Powered by OpenClaw",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

@@ -6,7 +6,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -18,17 +20,20 @@ import java.net.URL
 import org.json.JSONObject
 
 sealed class GatewayState {
-    data object Stopped : GatewayState()
-    data object Downloading : GatewayState()
+    data object Idle : GatewayState()
+    data object Preparing : GatewayState()     // extracting bundled rootfs
+    data object Downloading : GatewayState()   // downloading layers (fallback/update)
     data object Extracting : GatewayState()
-    data object Starting : GatewayState()
-    data object Running : GatewayState()
+    data object Starting : GatewayState()      // gateway process starting
+    data object WaitingForUi : GatewayState()  // gateway up, polling serve-ui
+    data object Running : GatewayState()       // both gateway + serve-ui ready
     data class Error(val message: String) : GatewayState()
 }
 
 data class LayerInfo(
     val name: String,
-    val url: String,
+    val assetFile: String,       // filename in assets/rootfs/
+    val fallbackUrl: String,     // network fallback
     val sizeBytes: Long,
     val displaySize: String,
 )
@@ -41,155 +46,390 @@ class GatewayManager(private val context: Context) {
             "https://github.com/4ier/lilclaw/releases/download/layers-v2"
 
         val LAYERS = listOf(
-            LayerInfo("base", "$RELEASES_BASE/base-arm64-2.0.0.tar.gz", 42_713_180L, "41 MB"),
-            LayerInfo("openclaw", "$RELEASES_BASE/openclaw-2026.2.17.tar.gz", 33_380_716L, "32 MB"),
-            LayerInfo("chatspa", "$RELEASES_BASE/chatspa-0.3.0.tar.gz", 236_000L, "231 KB"),
+            LayerInfo(
+                "base", "base-arm64-2.0.0.tar.gz",
+                "$RELEASES_BASE/base-arm64-2.0.0.tar.gz",
+                42_713_180L, "41 MB"
+            ),
+            LayerInfo(
+                "openclaw", "openclaw-2026.2.17.tar.gz",
+                "$RELEASES_BASE/openclaw-2026.2.17.tar.gz",
+                33_380_716L, "32 MB"
+            ),
+            LayerInfo(
+                "chatspa", "chatspa-0.3.0.tar.gz",
+                "$RELEASES_BASE/chatspa-0.3.0.tar.gz",
+                236_000L, "231 KB"
+            ),
         )
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val _state = MutableStateFlow<GatewayState>(GatewayState.Stopped)
+    private val _state = MutableStateFlow<GatewayState>(GatewayState.Idle)
     val state: StateFlow<GatewayState> = _state
 
-    private val _extractionProgress = MutableStateFlow(0f)
-    val extractionProgress: StateFlow<Float> = _extractionProgress
+    private val _progress = MutableStateFlow(0f)
+    val progress: StateFlow<Float> = _progress
 
-    private val _currentLayer = MutableStateFlow("")
-    val currentLayer: StateFlow<String> = _currentLayer
+    // Boot log lines for the UI console
+    private val _logLines = MutableSharedFlow<String>(replay = 50, extraBufferCapacity = 200)
+    val logLines: SharedFlow<String> = _logLines
 
     private var gatewayProcess: Process? = null
     private var serveUiProcess: Process? = null
 
-    private val rootfsDir: File
-        get() = File(context.filesDir, "rootfs")
+    private val rootfsDir: File get() = File(context.filesDir, "rootfs")
+    private val nativeLibDir: File get() = File(context.applicationInfo.nativeLibraryDir)
+    private val prootBin: File get() = File(nativeLibDir, "libproot.so")
+    private val tallocLib: File get() = File(nativeLibDir, "libtalloc.so")
+    private val prootLoaderBin: File get() = File(nativeLibDir, "libproot_loader.so")
+    private val layersJson: File get() = File(rootfsDir, ".layers.json")
+    private val libDir: File get() = File(context.filesDir, "lib")
 
-    private val nativeLibDir: File
-        get() = File(context.applicationInfo.nativeLibraryDir)
-
-    private val prootBin: File
-        get() = File(nativeLibDir, "libproot.so")
-
-    private val tallocLib: File
-        get() = File(nativeLibDir, "libtalloc.so")
-
-    private val prootLoaderBin: File
-        get() = File(nativeLibDir, "libproot_loader.so")
-
-    private val layersJson: File
-        get() = File(rootfsDir, ".layers.json")
-
-    val isRootfsExtracted: Boolean
+    val isRootfsReady: Boolean
         get() = layersJson.exists()
                 && File(rootfsDir, "usr/bin/node").exists()
                 && File(rootfsDir, "usr/local/bin/openclaw").exists()
 
-    fun extractRootfs(onComplete: () -> Unit) {
+    private fun log(msg: String) {
+        Log.i(TAG, msg)
+        _logLines.tryEmit(msg)
+    }
+
+    /**
+     * Full bootstrap: extract rootfs → write config → start gateway → poll UI ready.
+     * Drives state from Preparing all the way to Running.
+     * Call this once from SetupViewModel after user configures provider.
+     */
+    fun bootstrap(
+        provider: String,
+        apiKey: String,
+        model: String,
+        port: Int = 3000,
+        onReady: () -> Unit,
+    ) {
         scope.launch {
             try {
-                if (isRootfsExtracted) {
-                    Log.i(TAG, "Rootfs already extracted, skipping")
-                    onComplete()
-                    return@launch
+                // Start foreground service immediately to survive backgrounding
+                GatewayService.start(context)
+
+                // Phase 1: Extract rootfs (from assets or network)
+                if (!isRootfsReady) {
+                    _state.value = GatewayState.Preparing
+                    _progress.value = 0f
+                    GatewayService.updateStatus(context, "Setting up...")
+                    extractRootfsInternal()
                 }
 
-                // Calculate total download size for progress
-                val totalBytes = LAYERS.sumOf { it.sizeBytes }
-                var completedBytes = 0L
+                // Phase 2: Write config
+                log("Writing configuration...")
+                writeGatewayConfig(port, provider, apiKey, model)
+                _progress.value = 0.8f
 
-                rootfsDir.mkdirs()
+                // Phase 3: Start gateway
+                _state.value = GatewayState.Starting
+                GatewayService.updateStatus(context, "Starting gateway...")
+                log("Starting gateway...")
+                startGatewayProcess(port)
+                _progress.value = 0.85f
 
-                for (layer in LAYERS) {
-                    _currentLayer.value = layer.name
-                    val tarGzFile = File(context.cacheDir, "${layer.name}.tar.gz")
+                // Phase 4: Wait for gateway to be listening
+                log("Waiting for gateway...")
+                waitForPort(port, timeoutMs = 60_000)
+                _progress.value = 0.9f
 
-                    // Download phase
-                    _state.value = GatewayState.Downloading
-                    downloadFile(layer.url, tarGzFile) { layerProgress ->
-                        val layerDownloaded = (layer.sizeBytes * layerProgress).toLong()
-                        _extractionProgress.value =
-                            ((completedBytes + layerDownloaded).toFloat() / totalBytes * 0.7f)
-                                .coerceAtMost(0.7f)
-                    }
+                // Phase 5: Start serve-ui
+                _state.value = GatewayState.WaitingForUi
+                log("Starting Chat UI...")
+                startServeUiProcess()
 
-                    // Extract phase
-                    _state.value = GatewayState.Extracting
-                    extractTarGz(tarGzFile, rootfsDir)
-                    tarGzFile.delete()
+                // Phase 6: Poll serve-ui readiness
+                log("Waiting for Chat UI...")
+                waitForPort(3001, timeoutMs = 30_000)
+                _progress.value = 1f
 
-                    completedBytes += layer.sizeBytes
-                    _extractionProgress.value = (completedBytes.toFloat() / totalBytes * 0.7f)
-                        .coerceAtMost(0.7f)
+                log("Ready")
+                _state.value = GatewayState.Running
+                GatewayService.updateStatus(context, "Running")
+                onReady()
 
-                    Log.i(TAG, "Layer '${layer.name}' installed")
-                }
-
-                // Post-extraction setup
-                _currentLayer.value = "setup"
-                _extractionProgress.value = 0.8f
-
-                writeAndroidCompat()
-                makeRootfsExecutable()
-                writeLayersJson()
-
-                _extractionProgress.value = 1f
-                _currentLayer.value = ""
-
-                if (!isRootfsExtracted) {
-                    throw RuntimeException("Rootfs extraction failed: key binaries not found")
-                }
-
-                Log.i(TAG, "All layers installed successfully")
-                _state.value = GatewayState.Stopped
-                onComplete()
             } catch (e: Exception) {
-                Log.e(TAG, "Rootfs extraction failed", e)
-                _state.value = GatewayState.Error("Setup failed: ${e.message}")
-                _currentLayer.value = ""
-                rootfsDir.deleteRecursively()
+                Log.e(TAG, "Bootstrap failed", e)
+                log("Error: ${e.message}")
+                _state.value = GatewayState.Error(e.message ?: "Unknown error")
             }
         }
     }
 
-    private fun writeAndroidCompat() {
-        val file = File(rootfsDir, "root/android-compat.cjs")
-        file.parentFile?.mkdirs()
-        file.writeText(
-            "const os = require('os');\n" +
-            "const _ni = os.networkInterfaces;\n" +
-            "os.networkInterfaces = function() {\n" +
-            "  try { return _ni.call(this); } catch(e) {\n" +
-            "    return { lo: [{ address: '127.0.0.1', netmask: '255.0.0.0', family: 'IPv4', mac: '00:00:00:00:00:00', internal: true, cidr: '127.0.0.1/8' }] };\n" +
-            "  }\n" +
-            "};\n"
-        )
-        Log.i(TAG, "Wrote android-compat.cjs")
+    /**
+     * Quick start for app restart (rootfs already extracted, config already written).
+     */
+    fun quickStart(
+        provider: String = "",
+        apiKey: String = "",
+        model: String = "",
+        port: Int = 3000,
+        onReady: () -> Unit = {},
+    ) {
+        if (_state.value == GatewayState.Running) return
+        scope.launch {
+            try {
+                GatewayService.start(context)
+
+                if (!isRootfsReady) {
+                    _state.value = GatewayState.Error("Rootfs not ready")
+                    return@launch
+                }
+
+                if (provider.isNotEmpty()) {
+                    writeGatewayConfig(port, provider, apiKey, model)
+                }
+
+                _state.value = GatewayState.Starting
+                _progress.value = 0.5f
+                GatewayService.updateStatus(context, "Starting gateway...")
+                log("Starting gateway...")
+                setupLibDir()
+                makeRootfsExecutable()
+                startGatewayProcess(port)
+
+                log("Waiting for gateway...")
+                waitForPort(port, timeoutMs = 60_000)
+                _progress.value = 0.8f
+
+                _state.value = GatewayState.WaitingForUi
+                log("Starting Chat UI...")
+                startServeUiProcess()
+                log("Waiting for Chat UI...")
+                waitForPort(3001, timeoutMs = 30_000)
+
+                _progress.value = 1f
+                log("Ready")
+                _state.value = GatewayState.Running
+                GatewayService.updateStatus(context, "Running")
+                onReady()
+            } catch (e: Exception) {
+                Log.e(TAG, "Quick start failed", e)
+                log("Error: ${e.message}")
+                _state.value = GatewayState.Error(e.message ?: "Unknown error")
+            }
+        }
     }
 
-    private fun writeLayersJson() {
-        val now = java.time.Instant.now().toString()
-        val json = JSONObject().apply {
-            put("base", JSONObject().apply {
-                put("version", "2.0.0")
-                put("installedAt", now)
-            })
-            put("openclaw", JSONObject().apply {
-                put("version", "2026.2.17")
-                put("installedAt", now)
-            })
-            put("chatspa", JSONObject().apply {
-                put("version", "0.3.0")
-                put("installedAt", now)
-            })
+    // ── Rootfs extraction ─────────────────────────────────
+
+    private suspend fun extractRootfsInternal() {
+        val totalBytes = LAYERS.sumOf { it.sizeBytes }
+        var completedBytes = 0L
+        rootfsDir.mkdirs()
+
+        for ((idx, layer) in LAYERS.withIndex()) {
+            val tarGzFile = File(context.cacheDir, "${layer.name}.tar.gz")
+
+            // Try bundled asset first, fall back to network
+            val hasAsset = hasAssetFile("rootfs/${layer.assetFile}")
+            if (hasAsset) {
+                _state.value = GatewayState.Preparing
+                log("Unpacking ${layer.name}...")
+                copyAssetToFile("rootfs/${layer.assetFile}", tarGzFile)
+            } else {
+                _state.value = GatewayState.Downloading
+                log("Downloading ${layer.name} (${layer.displaySize})...")
+                downloadFile(layer.fallbackUrl, tarGzFile) { layerProgress ->
+                    val layerDownloaded = (layer.sizeBytes * layerProgress).toLong()
+                    _progress.value = ((completedBytes + layerDownloaded).toFloat() / totalBytes * 0.7f)
+                        .coerceAtMost(0.7f)
+                }
+            }
+
+            // Extract (can overlap with next download in the future)
+            _state.value = GatewayState.Extracting
+            log("Installing ${layer.name}...")
+            extractTarGz(tarGzFile, rootfsDir)
+            tarGzFile.delete()
+
+            completedBytes += layer.sizeBytes
+            _progress.value = (completedBytes.toFloat() / totalBytes * 0.7f).coerceAtMost(0.7f)
+            log("${layer.name} ✓")
         }
-        layersJson.writeText(json.toString(2))
-        Log.i(TAG, "Wrote .layers.json")
+
+        // Post-extraction setup
+        log("Configuring environment...")
+        _progress.value = 0.75f
+        writeAndroidCompat()
+        setupLibDir()
+        makeRootfsExecutable()
+        writeLayersJson()
+
+        if (!isRootfsReady) {
+            throw RuntimeException("Rootfs extraction failed: key binaries not found")
+        }
+        log("Environment ready ✓")
+    }
+
+    private fun hasAssetFile(path: String): Boolean {
+        return try {
+            context.assets.open(path).use { true }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private suspend fun copyAssetToFile(assetPath: String, target: File) = withContext(Dispatchers.IO) {
+        target.parentFile?.mkdirs()
+        context.assets.open(assetPath).use { input ->
+            FileOutputStream(target).use { output ->
+                input.copyTo(output, bufferSize = 65536)
+            }
+        }
+    }
+
+    // ── Gateway process management ────────────────────────
+
+    private suspend fun startGatewayProcess(port: Int) = withContext(Dispatchers.IO) {
+        setupLibDir()
+        makeRootfsExecutable()
+        prootBin.setExecutable(true)
+
+        val gwCmd = buildProotCommand(
+            "node /usr/local/bin/openclaw gateway run --allow-unconfigured --port $port --token lilclaw-local"
+        )
+
+        val processBuilder = ProcessBuilder(gwCmd)
+            .directory(rootfsDir)
+            .redirectErrorStream(true)
+
+        gatewayProcess = processBuilder.start()
+
+        // Pump gateway stdout to log
+        scope.launch {
+            gatewayProcess?.inputStream?.bufferedReader()?.use { reader ->
+                reader.lineSequence().forEach { line ->
+                    Log.d(TAG, "[gw] $line")
+                    // Filter noisy lines, only emit meaningful ones
+                    if (line.contains("listening") || line.contains("error", ignoreCase = true)
+                        || line.contains("ready") || line.contains("started")
+                        || line.contains("config") || line.contains("agent")
+                    ) {
+                        _logLines.tryEmit(line.take(120))
+                    }
+                }
+            }
+        }
+    }
+
+    private fun startServeUiProcess() {
+        if (serveUiProcess?.isAlive == true) return
+
+        val serveUiFile = File(rootfsDir, "root/lilclaw-ui/serve-ui.cjs")
+        if (!serveUiFile.exists()) {
+            log("serve-ui.cjs not found, skipping Chat UI server")
+            return
+        }
+
+        val cmd = buildProotCommand("node /root/lilclaw-ui/serve-ui.cjs")
+        val processBuilder = ProcessBuilder(cmd)
+            .directory(rootfsDir)
+            .redirectErrorStream(true)
+
+        serveUiProcess = processBuilder.start()
+        log("Chat UI server started")
+
+        scope.launch {
+            serveUiProcess?.inputStream?.bufferedReader()?.use { reader ->
+                reader.lineSequence().forEach { line ->
+                    Log.d(TAG, "[ui] $line")
+                }
+            }
+        }
+    }
+
+    /**
+     * Poll a local port until it responds with HTTP 200 (or any non-error).
+     */
+    private suspend fun waitForPort(port: Int, timeoutMs: Long) = withContext(Dispatchers.IO) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        var lastError: String? = null
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                val conn = URL("http://127.0.0.1:$port/").openConnection() as HttpURLConnection
+                conn.connectTimeout = 2000
+                conn.readTimeout = 2000
+                conn.requestMethod = "GET"
+                val code = conn.responseCode
+                conn.disconnect()
+                if (code in 100..499) {
+                    log("Port $port ready (HTTP $code)")
+                    return@withContext
+                }
+                lastError = "HTTP $code"
+            } catch (e: Exception) {
+                lastError = e.message
+            }
+            delay(500)
+        }
+        throw RuntimeException("Port $port not ready after ${timeoutMs / 1000}s: $lastError")
+    }
+
+    fun stop() {
+        serveUiProcess?.let { process ->
+            Log.i(TAG, "Stopping serve-ui")
+            process.destroy()
+            scope.launch {
+                delay(3000)
+                if (process.isAlive) process.destroyForcibly()
+            }
+        }
+        serveUiProcess = null
+
+        gatewayProcess?.let { process ->
+            Log.i(TAG, "Stopping gateway")
+            process.destroy()
+            scope.launch {
+                delay(5000)
+                if (process.isAlive) process.destroyForcibly()
+            }
+        }
+        gatewayProcess = null
+        _state.value = GatewayState.Idle
+        GatewayService.stop(context)
+    }
+
+    fun restart(port: Int = 3000, provider: String = "", apiKey: String = "", model: String = "") {
+        stop()
+        scope.launch {
+            delay(1000)
+            quickStart(port = port, provider = provider, apiKey = apiKey, model = model)
+        }
+    }
+
+    // ── Helpers ────────────────────────────────────────────
+
+    private fun buildProotCommand(cmd: String): List<String> {
+        return listOf(
+            "sh", "-c",
+            buildString {
+                append("export LD_LIBRARY_PATH=${libDir.absolutePath}:${nativeLibDir.absolutePath} && ")
+                append("export PROOT_TMP_DIR=${context.cacheDir.absolutePath} && ")
+                append("export PROOT_LOADER=${prootLoaderBin.absolutePath} && ")
+                append("exec ${prootBin.absolutePath}")
+                append(" --link2symlink -0")
+                append(" -r ${rootfsDir.absolutePath}")
+                append(" -b /dev -b /proc -b /sys")
+                append(" -w /root")
+                append(" /usr/bin/env HOME=/root")
+                append(" PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
+                append(" NODE_OPTIONS='--require /root/android-compat.cjs'")
+                append(" $cmd")
+            }
+        )
     }
 
     private suspend fun downloadFile(
         urlStr: String,
         target: File,
-        onProgress: (Float) -> Unit
+        onProgress: (Float) -> Unit,
     ) = withContext(Dispatchers.IO) {
         Log.i(TAG, "Downloading $urlStr")
         var connection: HttpURLConnection? = null
@@ -231,7 +471,7 @@ class GatewayManager(private val context: Context) {
                     }
                 }
             }
-            Log.i(TAG, "Downloaded ${downloadedBytes / 1024 / 1024}MB to ${target.name}")
+            Log.i(TAG, "Downloaded ${downloadedBytes / 1024 / 1024}MB")
         } finally {
             connection?.disconnect()
         }
@@ -241,9 +481,7 @@ class GatewayManager(private val context: Context) {
         tarGzFile: File,
         targetDir: File,
     ) = withContext(Dispatchers.IO) {
-        Log.i(TAG, "Extracting ${tarGzFile.name} to ${targetDir.absolutePath}")
         targetDir.mkdirs()
-
         val process = ProcessBuilder(
             "tar", "xzf", tarGzFile.absolutePath, "-C", targetDir.absolutePath
         ).redirectErrorStream(true).start()
@@ -253,172 +491,36 @@ class GatewayManager(private val context: Context) {
             val error = process.inputStream.bufferedReader().readText()
             throw RuntimeException("tar extraction failed (code $exitCode): $error")
         }
-
-        Log.i(TAG, "Extraction of ${tarGzFile.name} complete")
     }
 
-    private fun buildProotCommand(cmd: String, port: Int? = null): List<String> {
-        return listOf(
-            "sh", "-c",
-            buildString {
-                append("export LD_LIBRARY_PATH=${libDir.absolutePath}:${nativeLibDir.absolutePath} && ")
-                append("export PROOT_TMP_DIR=${context.cacheDir.absolutePath} && ")
-                append("export PROOT_LOADER=${prootLoaderBin.absolutePath} && ")
-                append("exec ${prootBin.absolutePath}")
-                append(" --link2symlink -0")
-                append(" -r ${rootfsDir.absolutePath}")
-                append(" -b /dev -b /proc -b /sys")
-                append(" -w /root")
-                append(" /usr/bin/env HOME=/root")
-                append(" PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
-                append(" NODE_OPTIONS='--require /root/android-compat.cjs'")
-                append(" $cmd")
-            }
+    private fun writeAndroidCompat() {
+        val file = File(rootfsDir, "root/android-compat.cjs")
+        file.parentFile?.mkdirs()
+        file.writeText(
+            "const os = require('os');\n" +
+            "const _ni = os.networkInterfaces;\n" +
+            "os.networkInterfaces = function() {\n" +
+            "  try { return _ni.call(this); } catch(e) {\n" +
+            "    return { lo: [{ address: '127.0.0.1', netmask: '255.0.0.0', family: 'IPv4', mac: '00:00:00:00:00:00', internal: true, cidr: '127.0.0.1/8' }] };\n" +
+            "  }\n" +
+            "};\n"
         )
     }
 
-    fun start(port: Int = 3000, provider: String = "", apiKey: String = "", model: String = "") {
-        if (_state.value == GatewayState.Running) return
-        scope.launch {
-            _state.value = GatewayState.Starting
-            try {
-                if (!prootBin.exists()) {
-                    throw RuntimeException("proot binary not found at ${prootBin.absolutePath}")
-                }
-                if (!isRootfsExtracted) {
-                    throw RuntimeException("Rootfs not extracted")
-                }
-
-                if (provider.isNotEmpty()) {
-                    writeGatewayConfig(port, provider, apiKey, model)
-                }
-
-                setupLibDir()
-                makeRootfsExecutable()
-                prootBin.setExecutable(true)
-
-                // Start gateway
-                val gwCmd = buildProotCommand(
-                    "node /usr/local/bin/openclaw gateway run --allow-unconfigured --port $port --token lilclaw-local"
-                )
-
-                Log.i(TAG, "Starting gateway on port $port")
-                val processBuilder = ProcessBuilder(gwCmd)
-                    .directory(rootfsDir)
-                    .redirectErrorStream(true)
-
-                gatewayProcess = processBuilder.start()
-
-                var isListening = false
-                val allLines = mutableListOf<String>()
-                scope.launch {
-                    gatewayProcess?.inputStream?.bufferedReader()?.use { reader ->
-                        reader.lineSequence().forEach { line ->
-                            Log.d(TAG, "[gateway] $line")
-                            synchronized(allLines) { allLines.add(line) }
-                            if (!isListening && line.contains("listening on ws://")) {
-                                isListening = true
-                                _state.value = GatewayState.Running
-                                Log.i(TAG, "Gateway is listening on port $port")
-
-                                // Start serve-ui after gateway is up
-                                startServeUi()
-                            }
-                        }
-                    }
-                }
-
-                delay(30000)
-                if (!isListening && gatewayProcess?.isAlive == true) {
-                    _state.value = GatewayState.Running
-                    Log.i(TAG, "Gateway is running on port $port (fallback)")
-                    startServeUi()
-                    monitorProcess()
-                } else if (gatewayProcess?.isAlive != true) {
-                    val exitCode = gatewayProcess?.exitValue() ?: -1
-                    val output = synchronized(allLines) { allLines.toList() }
-                    val errorKeyLines = output.filter {
-                        it.contains("Error") || it.contains("Cannot") || it.contains("FATAL") || it.contains("error:")
-                    }
-                    val summary = if (errorKeyLines.isNotEmpty()) {
-                        errorKeyLines.joinToString("\n")
-                    } else {
-                        output.takeLast(15).joinToString("\n")
-                    }
-                    Log.e(TAG, "Gateway failed (code $exitCode): $summary")
-                    _state.value = GatewayState.Error("Exit $exitCode:\n$summary")
-                } else {
-                    monitorProcess()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Start failed", e)
-                _state.value = GatewayState.Error("Start failed: ${e.message}")
-            }
+    private fun writeLayersJson() {
+        val now = java.time.Instant.now().toString()
+        val json = JSONObject().apply {
+            put("base", JSONObject().apply {
+                put("version", "2.0.0"); put("installedAt", now)
+            })
+            put("openclaw", JSONObject().apply {
+                put("version", "2026.2.17"); put("installedAt", now)
+            })
+            put("chatspa", JSONObject().apply {
+                put("version", "0.3.0"); put("installedAt", now)
+            })
         }
-    }
-
-    private fun startServeUi() {
-        if (serveUiProcess?.isAlive == true) return
-
-        val serveUiFile = File(rootfsDir, "root/lilclaw-ui/serve-ui.cjs")
-        if (!serveUiFile.exists()) {
-            Log.w(TAG, "serve-ui.cjs not found, Chat SPA will not be available")
-            return
-        }
-
-        scope.launch {
-            try {
-                val cmd = buildProotCommand("node /root/lilclaw-ui/serve-ui.cjs")
-                val processBuilder = ProcessBuilder(cmd)
-                    .directory(rootfsDir)
-                    .redirectErrorStream(true)
-
-                serveUiProcess = processBuilder.start()
-                Log.i(TAG, "serve-ui.cjs started on port 3001")
-
-                // Log output
-                scope.launch {
-                    serveUiProcess?.inputStream?.bufferedReader()?.use { reader ->
-                        reader.lineSequence().forEach { line ->
-                            Log.d(TAG, "[serve-ui] $line")
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to start serve-ui: ${e.message}")
-            }
-        }
-    }
-
-    fun stop() {
-        serveUiProcess?.let { process ->
-            Log.i(TAG, "Stopping serve-ui")
-            process.destroy()
-            scope.launch {
-                delay(3000)
-                if (process.isAlive) process.destroyForcibly()
-            }
-        }
-        serveUiProcess = null
-
-        gatewayProcess?.let { process ->
-            Log.i(TAG, "Stopping gateway")
-            process.destroy()
-            scope.launch {
-                delay(5000)
-                if (process.isAlive) process.destroyForcibly()
-            }
-        }
-        gatewayProcess = null
-        _state.value = GatewayState.Stopped
-    }
-
-    fun restart(port: Int = 3000, provider: String = "", apiKey: String = "", model: String = "") {
-        stop()
-        scope.launch {
-            delay(1000)
-            start(port, provider, apiKey, model)
-        }
+        layersJson.writeText(json.toString(2))
     }
 
     private fun writeGatewayConfig(port: Int, provider: String, apiKey: String, model: String) {
@@ -518,11 +620,8 @@ class GatewayManager(private val context: Context) {
         }
 
         configFile.writeText(config.toString(2))
-        Log.i(TAG, "Wrote gateway config to ${configFile.absolutePath}")
+        log("Configuration written ✓")
     }
-
-    private val libDir: File
-        get() = File(context.filesDir, "lib")
 
     private fun setupLibDir() {
         libDir.mkdirs()
@@ -538,10 +637,9 @@ class GatewayManager(private val context: Context) {
                     tallocLib.copyTo(target, overwrite = true)
                     target.setReadable(true)
                     target.setExecutable(true, false)
-                    Log.i(TAG, "Copied libtalloc.so.2 to ${target.absolutePath}")
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to copy libtalloc.so.2 to ${target.absolutePath}: ${e.message}")
+                Log.w(TAG, "Failed to copy libtalloc to ${target.absolutePath}: ${e.message}")
             }
         }
     }
@@ -565,25 +663,5 @@ class GatewayManager(private val context: Context) {
             ?.filter { it.name.endsWith(".so") || it.name.contains(".so.") }
             ?.forEach { it.setReadable(true); it.setExecutable(true, false) }
         File(rootfsDir, "lib").listFiles()?.forEach { it.setExecutable(true, false) }
-        Log.i(TAG, "Made rootfs binaries executable")
-    }
-
-    private fun monitorProcess() {
-        scope.launch {
-            gatewayProcess?.let { process ->
-                try {
-                    val exitCode = process.waitFor()
-                    if (_state.value == GatewayState.Running) {
-                        Log.w(TAG, "Gateway exited unexpectedly (code $exitCode)")
-                        _state.value =
-                            GatewayState.Error("Gateway exited unexpectedly (code $exitCode)")
-                        delay(3000)
-                        start()
-                    }
-                } catch (_: InterruptedException) {
-                    // Expected on stop
-                }
-            }
-        }
     }
 }
