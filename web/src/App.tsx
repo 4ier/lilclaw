@@ -3,12 +3,26 @@ import { useStore } from './store'
 import ChatScreen from './components/ChatScreen'
 import SessionDrawer from './components/SessionDrawer'
 import Settings from './components/Settings'
+import { mockConversation } from './lib/mockData'
+
+const USE_MOCK = new URLSearchParams(window.location.search).has('mock')
 
 export default function App() {
   const { showSettings, showDrawer, connect } = useStore()
 
   useEffect(() => {
-    connect()
+    if (USE_MOCK) {
+      // Load mock data for testing rendering
+      useStore.setState((state) => ({
+        connectionState: 'connected',
+        messages: {
+          ...state.messages,
+          main: mockConversation,
+        },
+      }))
+    } else {
+      connect()
+    }
   }, [connect])
 
   return (

@@ -23,9 +23,9 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="absolute top-2 right-2 px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors touch-target"
+      className="absolute top-2 right-2 px-2 py-1 text-[11px] rounded-md bg-white/10 hover:bg-white/20 text-gray-300 transition-all opacity-0 group-hover:opacity-100 touch-target backdrop-blur-sm"
     >
-      {copied ? 'Copied!' : 'Copy'}
+      {copied ? '✓ Copied' : 'Copy'}
     </button>
   )
 }
@@ -74,8 +74,13 @@ function CodeBlock({ className, children }: { className?: string; children: Reac
 
   return (
     <div className="relative group">
+      {language && (
+        <div className="absolute top-0 left-0 px-2.5 py-1 text-[10px] uppercase tracking-wider text-gray-400 font-medium select-none">
+          {language}
+        </div>
+      )}
       <CopyButton text={code} />
-      <pre className={className}>
+      <pre className={`${className} !mt-0`} style={{ paddingTop: language ? '1.75rem' : undefined }}>
         <code className={className}>{children}</code>
       </pre>
     </div>
@@ -121,6 +126,13 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                   return <code {...props}>{children}</code>
                 }
                 return <CodeBlock className={className}>{children}</CodeBlock>
+              },
+              table({ children }) {
+                return (
+                  <div className="table-wrapper">
+                    <table>{children}</table>
+                  </div>
+                )
               },
             }}
           >

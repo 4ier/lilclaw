@@ -20,8 +20,8 @@ function ConnectionIndicator() {
   }
 
   return (
-    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-      <span className={`w-2 h-2 rounded-full ${colors[connectionState]}`} />
+    <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+      <span className={`w-1.5 h-1.5 rounded-full ${colors[connectionState]}`} />
       <span>{labels[connectionState]}</span>
     </div>
   )
@@ -123,19 +123,19 @@ export default function ChatScreen() {
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 safe-top bg-white dark:bg-gray-900">
+      <header className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 safe-top bg-white/80 dark:bg-[#0f0f0f]/80 backdrop-blur-lg">
         <button
           onClick={() => setShowDrawer(true)}
-          className="touch-target flex items-center justify-center -ml-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="touch-target flex items-center justify-center -ml-2 p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors active:scale-95"
           aria-label="Open sessions"
         >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
 
         <div className="flex flex-col items-center">
-          <h1 className="font-semibold text-gray-900 dark:text-white">
+          <h1 className="font-semibold text-[15px] text-gray-900 dark:text-white">
             {currentSessionKey}
           </h1>
           <ConnectionIndicator />
@@ -143,22 +143,12 @@ export default function ChatScreen() {
 
         <button
           onClick={() => setShowSettings(true)}
-          className="touch-target flex items-center justify-center -mr-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="touch-target flex items-center justify-center -mr-2 p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors active:scale-95"
           aria-label="Settings"
         >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-            />
+          <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         </button>
       </header>
@@ -205,16 +195,16 @@ export default function ChatScreen() {
       {/* Input bar */}
       <form
         onSubmit={handleSubmit}
-        className="flex items-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-700 safe-bottom bg-white dark:bg-gray-900"
+        className="flex items-end gap-2 px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 safe-bottom bg-white/80 dark:bg-[#0f0f0f]/80 backdrop-blur-lg"
       >
         <textarea
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type a message..."
+          placeholder="Message..."
           rows={1}
-          className="flex-1 resize-none px-4 py-3 rounded-2xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent transition-colors"
+          className="flex-1 resize-none px-3.5 py-2.5 rounded-[20px] border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:focus:ring-indigo-400/40 focus:border-indigo-300 dark:focus:border-indigo-600 transition-all text-[15px]"
           style={{ maxHeight: '120px' }}
           disabled={connectionState !== 'connected'}
         />
@@ -222,16 +212,11 @@ export default function ChatScreen() {
         <button
           type="submit"
           disabled={!input.trim() || isSending || connectionState !== 'connected'}
-          className="touch-target flex items-center justify-center p-3 rounded-full bg-indigo-600 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
+          className="touch-target flex items-center justify-center p-2.5 rounded-full bg-indigo-600 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-700 active:bg-indigo-800 active:scale-95 transition-all"
           aria-label="Send message"
         >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-            />
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
           </svg>
         </button>
       </form>

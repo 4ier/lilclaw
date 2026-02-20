@@ -10,12 +10,16 @@
 
 @layer base {
   html {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-size: 15px;
+    line-height: 1.5;
   }
 
   body {
-    @apply bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100;
+    @apply bg-white text-gray-900 dark:bg-[#0f0f0f] dark:text-gray-100;
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
@@ -23,21 +27,29 @@
   }
 
   code {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   }
 }
 
 @layer components {
   .message-bubble {
-    @apply rounded-2xl px-4 py-2.5 max-w-[85%];
+    @apply px-3.5 py-2.5 max-w-[88%];
+    border-radius: 18px;
   }
 
   .message-bubble-user {
     @apply bg-indigo-600 text-white;
+    border-bottom-right-radius: 6px;
   }
 
   .message-bubble-assistant {
-    @apply bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-gray-100;
+    @apply bg-gray-100 text-gray-900 dark:bg-[#1e1e1e] dark:text-gray-100;
+    border-bottom-left-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  .dark .message-bubble-assistant {
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
   }
 
   .touch-target {
@@ -56,64 +68,240 @@
   }
 }
 
-/* Markdown styles */
+/* =============================================
+   Markdown typography
+   ============================================= */
+
 .prose-chat {
-  @apply text-sm leading-relaxed;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
+/* Headings — clear hierarchy */
+.prose-chat h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0.75rem 0 0.4rem;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.prose-chat h2 {
+  font-size: 1.15rem;
+  font-weight: 650;
+  margin: 0.6rem 0 0.3rem;
+  letter-spacing: -0.005em;
+  line-height: 1.35;
+}
+
+.prose-chat h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0.25rem;
+  line-height: 1.4;
+}
+
+.prose-chat h1:first-child,
+.prose-chat h2:first-child,
+.prose-chat h3:first-child {
+  margin-top: 0;
+}
+
+/* Paragraphs */
 .prose-chat p {
-  @apply my-1;
+  margin: 0.35rem 0;
 }
 
-.prose-chat p:first-child {
-  @apply mt-0;
+.prose-chat p:first-child { margin-top: 0; }
+.prose-chat p:last-child { margin-bottom: 0; }
+
+/* Horizontal rule */
+.prose-chat hr {
+  @apply border-gray-200 dark:border-gray-600;
+  margin: 0.75rem 0;
 }
 
-.prose-chat p:last-child {
-  @apply mb-0;
+/* Links */
+.prose-chat a {
+  @apply text-blue-600 dark:text-blue-400;
+  text-decoration: none;
+  font-weight: 500;
 }
 
-.prose-chat pre {
-  @apply my-2 rounded-lg overflow-x-auto text-xs;
+.prose-chat a:hover {
+  text-decoration: underline;
 }
 
+/* User bubble links should be white */
+.message-bubble-user .prose-chat a {
+  @apply text-white/90;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Inline code */
 .prose-chat code:not(pre code) {
-  @apply bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded text-[0.85em];
+  @apply text-[0.82em] font-medium;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.15em 0.4em;
+  border-radius: 5px;
 }
 
-.prose-chat ul, .prose-chat ol {
-  @apply my-1 pl-4;
+.dark .prose-chat code:not(pre code) {
+  background: rgba(255, 255, 255, 0.1);
 }
+
+.message-bubble-user .prose-chat code:not(pre code) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Code blocks */
+.prose-chat pre {
+  margin: 0.5rem -0.5rem;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  -webkit-overflow-scrolling: touch;
+}
+
+.prose-chat pre code {
+  display: block;
+  padding: 0.75rem 1rem;
+}
+
+/* Blockquote */
+.prose-chat blockquote {
+  @apply border-l-[3px] border-indigo-400 dark:border-indigo-500;
+  padding-left: 0.75rem;
+  margin: 0.5rem 0;
+  font-style: italic;
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* Lists */
+.prose-chat ul, .prose-chat ol {
+  margin: 0.3rem 0;
+  padding-left: 1.25rem;
+}
+
+.prose-chat ul { list-style-type: disc; }
+.prose-chat ol { list-style-type: decimal; }
 
 .prose-chat li {
-  @apply my-0.5;
+  margin: 0.15rem 0;
 }
 
-.prose-chat a {
-  @apply text-blue-500 dark:text-blue-400 underline;
+.prose-chat li > ul, .prose-chat li > ol {
+  margin: 0.1rem 0;
 }
 
-.prose-chat blockquote {
-  @apply border-l-2 border-gray-300 dark:border-gray-600 pl-3 my-2 italic;
+/* Task lists */
+.prose-chat ul:has(input[type="checkbox"]) {
+  list-style-type: none;
+  padding-left: 0.25rem;
+}
+
+.prose-chat li:has(> input[type="checkbox"]) {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.prose-chat input[type="checkbox"] {
+  @apply accent-indigo-500;
+  margin: 0;
+  transform: scale(1.1);
+}
+
+/* Tables */
+.prose-chat .table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0.5rem -0.25rem;
+  border-radius: 8px;
 }
 
 .prose-chat table {
-  @apply my-2 text-xs;
+  font-size: 0.8rem;
+  border-collapse: collapse;
+  width: 100%;
+  white-space: nowrap;
 }
 
-.prose-chat th, .prose-chat td {
-  @apply border border-gray-300 dark:border-gray-600 px-2 py-1;
+.prose-chat th {
+  @apply bg-gray-50 dark:bg-gray-800 text-left font-semibold;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+.dark .prose-chat th {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.prose-chat td {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.dark .prose-chat td {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.prose-chat tbody tr:nth-child(even) {
+  @apply bg-gray-50/50 dark:bg-white/[0.02];
+}
+
+/* Images */
 .prose-chat img {
-  @apply max-w-full rounded-lg my-2;
+  @apply max-w-full rounded-xl my-2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-/* Animation */
+.dark .prose-chat img {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Details/summary */
+.prose-chat details {
+  @apply my-2 rounded-lg;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.dark .prose-chat details {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.prose-chat summary {
+  @apply px-3 py-2 cursor-pointer font-medium text-sm;
+  @apply bg-gray-50 dark:bg-gray-800;
+}
+
+.prose-chat details[open] summary {
+  @apply border-b border-gray-200 dark:border-gray-700;
+}
+
+.prose-chat details > :not(summary) {
+  @apply px-3 py-2;
+}
+
+/* Strong/em */
+.prose-chat strong {
+  font-weight: 650;
+}
+
+/* =============================================
+   Animations
+   ============================================= */
+
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -132,20 +320,28 @@
 
 .cursor-blink::after {
   content: "▋";
-  animation: blink 1s infinite;
+  animation: blink 1s step-end infinite;
   @apply ml-0.5 text-indigo-500 dark:text-indigo-400;
+  font-size: 0.9em;
 }
 
-/* Scrollbar */
+/* =============================================
+   Scrollbar
+   ============================================= */
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-transparent;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400 dark:bg-gray-500;
 }
