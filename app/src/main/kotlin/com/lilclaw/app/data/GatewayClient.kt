@@ -87,8 +87,8 @@ class GatewayClient {
         _connectionState.value = GatewayConnectionState.Connecting
 
         val request = Request.Builder()
-            .url("ws://127.0.0.1:$port")
-            .header("Origin", "http://127.0.0.1:$port")
+            .url("ws://localhost:$port")
+            .header("Origin", "http://localhost:$port")
             .build()
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {

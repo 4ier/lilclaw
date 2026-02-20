@@ -32,6 +32,9 @@ class SettingsRepository(private val context: Context) {
     val model: Flow<String> = context.dataStore.data
         .map { it[Keys.MODEL] ?: "" }
 
+    val apiKey: Flow<String> = context.dataStore.data
+        .map { it[Keys.API_KEY] ?: "" }
+
     val gatewayPort: Flow<Int> = context.dataStore.data
         .map { it[Keys.GATEWAY_PORT] ?: 3000 }
 

@@ -33,7 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 
-private val PROVIDERS = listOf("OpenAI", "Anthropic", "AWS Bedrock", "Custom")
+private val PROVIDERS = listOf("OpenAI", "Anthropic", "DeepSeek", "AWS Bedrock", "Custom")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

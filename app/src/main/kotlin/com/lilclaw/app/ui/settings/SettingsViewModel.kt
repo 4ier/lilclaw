@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 data class SettingsState(
     val provider: String = "",
     val model: String = "",
+    val apiKey: String = "",
     val gatewayState: GatewayState = GatewayState.Stopped,
     val gatewayPort: Int = 3000,
 )
@@ -31,12 +32,14 @@ class SettingsViewModel(
             combine(
                 settings.provider,
                 settings.model,
+                settings.apiKey,
                 settings.gatewayPort,
                 gatewayManager.state,
-            ) { provider, model, port, gwState ->
+            ) { provider, model, apiKey, port, gwState ->
                 SettingsState(
                     provider = provider,
                     model = model,
+                    apiKey = apiKey,
                     gatewayPort = port,
                     gatewayState = gwState,
                 )
@@ -44,7 +47,13 @@ class SettingsViewModel(
         }
     }
 
-    fun startGateway() = gatewayManager.start(_state.value.gatewayPort)
+    fun startGateway() {
+        val s = _state.value
+        gatewayManager.start(s.gatewayPort, s.provider, s.apiKey, s.model)
+    }
     fun stopGateway() = gatewayManager.stop()
-    fun restartGateway() = gatewayManager.restart(_state.value.gatewayPort)
+    fun restartGateway() {
+        val s = _state.value
+        gatewayManager.restart(s.gatewayPort, s.provider, s.apiKey, s.model)
+    }
 }

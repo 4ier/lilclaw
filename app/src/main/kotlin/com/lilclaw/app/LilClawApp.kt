@@ -2,6 +2,7 @@ package com.lilclaw.app
 
 import android.app.Application
 import com.lilclaw.app.data.GatewayClient
+import com.lilclaw.app.data.GatewayConnectionState
 import com.lilclaw.app.data.SettingsRepository
 import com.lilclaw.app.di.appModule
 import com.lilclaw.app.service.GatewayManager
@@ -27,26 +28,33 @@ class LilClawApp : Application() {
             modules(appModule)
         }
 
-        // Auto-start gateway if setup is complete
+        // Auto-connect WebSocket when gateway becomes Running
+        appScope.launch {
+            val gateway: GatewayManager by inject()
+            val client: GatewayClient by inject()
+
+            gateway.state.collect { state ->
+                if (state is GatewayState.Running) {
+                    delay(500) // Brief buffer after listening detected
+                    if (client.connectionState.value !is GatewayConnectionState.Connected) {
+                        client.connect(port = 3000, token = "lilclaw-local")
+                    }
+                }
+            }
+        }
+
+        // Auto-start gateway if setup is complete (app restart case)
         appScope.launch {
             val settings: SettingsRepository by inject()
             val gateway: GatewayManager by inject()
-            val client: GatewayClient by inject()
 
             val setupComplete = settings.isSetupComplete.first()
             if (setupComplete && gateway.isRootfsExtracted) {
                 val provider = settings.provider.first()
+                val apiKey = settings.apiKey.first()
                 val model = settings.model.first()
                 if (gateway.state.value is GatewayState.Stopped) {
-                    gateway.start(provider = provider, apiKey = "", model = model)
-                }
-
-                // Wait for gateway to be running (detected via "listening on" log), then connect
-                gateway.state.collect { state ->
-                    if (state is GatewayState.Running) {
-                        delay(500) // Brief buffer after listening detected
-                        client.connect(port = 3000, token = "lilclaw-local")
-                    }
+                    gateway.start(provider = provider, apiKey = apiKey, model = model)
                 }
             }
         }

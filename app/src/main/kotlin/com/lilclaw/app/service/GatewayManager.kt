@@ -16,6 +16,7 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.zip.GZIPInputStream
+import org.json.JSONObject
 
 sealed class GatewayState {
     data object Stopped : GatewayState()
@@ -211,8 +212,8 @@ class GatewayManager(private val context: Context) {
                     throw RuntimeException("Rootfs not extracted")
                 }
 
-                // Write OpenClaw config.yaml into rootfs (skip if already exists and no new values)
-                if (provider.isNotEmpty() && apiKey.isNotEmpty()) {
+                // Write OpenClaw config.yaml into rootfs (always rewrite to ensure latest settings)
+                if (provider.isNotEmpty()) {
                     writeGatewayConfig(port, provider, apiKey, model)
                 } else {
                     val existingConfig = File(rootfsDir, "root/.config/openclaw/config.yaml")
@@ -233,6 +234,19 @@ class GatewayManager(private val context: Context) {
                 val cmd = listOf(
                     "sh", "-c",
                     buildString {
+                        // Write a Node.js preload script that patches os.networkInterfaces()
+                        // Android 10+ restricts /proc/net access, causing uv_interface_addresses EACCES
+                        val preloadFile = File(rootfsDir, "root/android-compat.cjs")
+                        preloadFile.writeText(
+                            "const os = require('os');\n" +
+                            "const _ni = os.networkInterfaces;\n" +
+                            "os.networkInterfaces = function() {\n" +
+                            "  try { return _ni.call(this); } catch(e) {\n" +
+                            "    return { lo: [{ address: '127.0.0.1', netmask: '255.0.0.0', family: 'IPv4', mac: '00:00:00:00:00:00', internal: true, cidr: '127.0.0.1/8' }] };\n" +
+                            "  }\n" +
+                            "};\n"
+                        )
+
                         append("export LD_LIBRARY_PATH=${libDir.absolutePath}:${nativeLibDir.absolutePath} && ")
                         append("export PROOT_TMP_DIR=${context.cacheDir.absolutePath} && ")
                         append("export PROOT_LOADER=${prootLoaderBin.absolutePath} && ")
@@ -242,8 +256,9 @@ class GatewayManager(private val context: Context) {
                         append(" -b /dev -b /proc -b /sys")
                         append(" -w /root")
                         append(" /usr/bin/env HOME=/root PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin")
+                        append(" NODE_OPTIONS='--require /root/android-compat.cjs'")
                         append(" node /usr/local/bin/openclaw")
-                        append(" gateway run --dev")
+                        append(" gateway run --allow-unconfigured")
                         append(" --port $port")
                         append(" --token lilclaw-local")
                     }
@@ -259,10 +274,12 @@ class GatewayManager(private val context: Context) {
 
                 // Log gateway output in background and detect when it's listening
                 var isListening = false
+                val allLines = mutableListOf<String>()
                 scope.launch {
                     gatewayProcess?.inputStream?.bufferedReader()?.use { reader ->
                         reader.lineSequence().forEach { line ->
                             Log.d(TAG, "[gateway] $line")
+                            synchronized(allLines) { allLines.add(line) }
                             if (!isListening && line.contains("listening on ws://")) {
                                 isListening = true
                                 _state.value = GatewayState.Running
@@ -281,7 +298,18 @@ class GatewayManager(private val context: Context) {
                     monitorProcess()
                 } else if (gatewayProcess?.isAlive != true) {
                     val exitCode = gatewayProcess?.exitValue() ?: -1
-                    _state.value = GatewayState.Error("Gateway exited with code $exitCode")
+                    val output = synchronized(allLines) { allLines.toList() }
+                    // Show error-relevant lines first, then last few lines
+                    val errorKeyLines = output.filter { 
+                        it.contains("Error") || it.contains("Cannot") || it.contains("FATAL") || it.contains("error:") 
+                    }
+                    val summary = if (errorKeyLines.isNotEmpty()) {
+                        errorKeyLines.joinToString("\n")
+                    } else {
+                        output.takeLast(15).joinToString("\n")
+                    }
+                    Log.e(TAG, "Gateway failed (code $exitCode): $summary")
+                    _state.value = GatewayState.Error("Exit $exitCode:\n$summary")
                 } else {
                     // Already listening
                     monitorProcess()
@@ -317,14 +345,16 @@ class GatewayManager(private val context: Context) {
     }
 
     private fun writeGatewayConfig(port: Int, provider: String, apiKey: String, model: String) {
-        val configDir = File(rootfsDir, "root/.config/openclaw")
+        // OpenClaw reads config from ~/.openclaw/openclaw.json (JSON format)
+        val configDir = File(rootfsDir, "root/.openclaw")
         configDir.mkdirs()
-        val configFile = File(configDir, "config.yaml")
+        val configFile = File(configDir, "openclaw.json")
 
         // Map UI provider names to OpenClaw provider format
         val providerSlug = when (provider.lowercase()) {
             "openai" -> "openai"
             "anthropic" -> "anthropic"
+            "deepseek" -> "deepseek"
             "aws bedrock" -> "amazon-bedrock"
             else -> provider.lowercase()
         }
@@ -332,43 +362,96 @@ class GatewayManager(private val context: Context) {
         val defaultModel = when (providerSlug) {
             "openai" -> "gpt-4o"
             "anthropic" -> "claude-sonnet-4-20250514"
+            "deepseek" -> "deepseek-chat"
             "amazon-bedrock" -> "anthropic.claude-sonnet-4-20250514-v1:0"
             else -> "gpt-4o"
         }
 
         val effectiveModel = model.ifBlank { defaultModel }
 
-        val config = buildString {
-            appendLine("# LilClaw auto-generated config")
-            appendLine("agents:")
-            appendLine("  defaults:")
-            appendLine("    model: \"$providerSlug/$effectiveModel\"")
-            appendLine()
-            appendLine("gateway:")
-            appendLine("  port: $port")
-            appendLine("  auth:")
-            appendLine("    token: \"lilclaw-local\"")
-            appendLine()
-            // API key as environment-style config
+        // Build config JSON
+        val config = JSONObject().apply {
+            put("agents", JSONObject().apply {
+                put("defaults", JSONObject().apply {
+                    put("model", JSONObject().apply {
+                        put("primary", "$providerSlug/$effectiveModel")
+                    })
+                    put("workspace", "/root/.openclaw/workspace-dev")
+                    put("skipBootstrap", true)
+                })
+                put("list", org.json.JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("id", "dev")
+                        put("default", true)
+                        put("workspace", "/root/.openclaw/workspace-dev")
+                    })
+                })
+            })
+            put("gateway", JSONObject().apply {
+                put("mode", "local")
+                put("port", port)
+                put("bind", "loopback")
+                put("auth", JSONObject().apply {
+                    put("token", "lilclaw-local")
+                })
+                put("controlUi", JSONObject().apply {
+                    put("allowInsecureAuth", true)
+                })
+            })
+            put("commands", JSONObject().apply {
+                put("native", "auto")
+                put("nativeSkills", "auto")
+            })
+
             when (providerSlug) {
                 "openai" -> {
-                    appendLine("providers:")
-                    appendLine("  openai:")
-                    appendLine("    apiKey: \"$apiKey\"")
+                    put("env", JSONObject().apply {
+                        put("OPENAI_API_KEY", apiKey)
+                    })
                 }
                 "anthropic" -> {
-                    appendLine("providers:")
-                    appendLine("  anthropic:")
-                    appendLine("    apiKey: \"$apiKey\"")
+                    put("env", JSONObject().apply {
+                        put("ANTHROPIC_API_KEY", apiKey)
+                    })
+                }
+                "deepseek" -> {
+                    // DeepSeek is OpenAI-compatible, configure as custom provider
+                    put("models", JSONObject().apply {
+                        put("mode", "merge")
+                        put("providers", JSONObject().apply {
+                            put("deepseek", JSONObject().apply {
+                                put("baseUrl", "https://api.deepseek.com/v1")
+                                put("apiKey", apiKey)
+                                put("api", "openai-completions")
+                                put("models", org.json.JSONArray().apply {
+                                    put(JSONObject().apply {
+                                        put("id", "deepseek-chat")
+                                        put("name", "DeepSeek Chat")
+                                        put("reasoning", false)
+                                        put("input", org.json.JSONArray().put("text"))
+                                        put("contextWindow", 64000)
+                                        put("maxTokens", 8192)
+                                    })
+                                    put(JSONObject().apply {
+                                        put("id", "deepseek-reasoner")
+                                        put("name", "DeepSeek Reasoner")
+                                        put("reasoning", true)
+                                        put("input", org.json.JSONArray().put("text"))
+                                        put("contextWindow", 64000)
+                                        put("maxTokens", 8192)
+                                    })
+                                })
+                            })
+                        })
+                    })
                 }
                 "amazon-bedrock" -> {
-                    // AWS uses env vars, write to profile
-                    appendLine("# AWS credentials should be set via environment")
+                    // AWS uses env vars
                 }
             }
         }
 
-        configFile.writeText(config)
+        configFile.writeText(config.toString(2))
         Log.i(TAG, "Wrote gateway config to ${configFile.absolutePath}")
     }
 

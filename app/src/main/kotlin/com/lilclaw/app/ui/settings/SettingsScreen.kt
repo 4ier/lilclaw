@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -88,11 +90,16 @@ fun SettingsScreen(
                     Spacer(Modifier.height(8.dp))
                     Text("Port: ${state.gatewayPort}", style = MaterialTheme.typography.bodyMedium)
                     if (state.gatewayState is GatewayState.Error) {
-                        Text(
-                            (state.gatewayState as GatewayState.Error).message,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                        androidx.compose.foundation.rememberScrollState().let { scrollState ->
+                            Text(
+                                (state.gatewayState as GatewayState.Error).message,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier
+                                    .heightIn(max = 200.dp)
+                                    .verticalScroll(scrollState),
+                            )
+                        }
                     }
                     Spacer(Modifier.height(16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
