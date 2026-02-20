@@ -71,7 +71,9 @@ export class GatewayClient {
     this.callbacks.onConnectionChange('connecting')
 
     try {
-      this.ws = new WebSocket(`ws://localhost:${this.port}`)
+      // Use same hostname as the page to work in both browser and Android WebView
+      const wsHost = window.location.hostname || '127.0.0.1'
+      this.ws = new WebSocket(`ws://${wsHost}:${this.port}`)
 
       this.ws.onopen = () => {
         this.reconnectAttempt = 0

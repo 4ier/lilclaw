@@ -31,7 +31,7 @@ export default function App() {
   }, [connect])
 
   return (
-    <div className="h-dvh flex flex-col overflow-hidden bg-white dark:bg-gray-900">
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-white dark:bg-gray-900">
       <ChatScreen />
       {showDrawer && <SessionDrawer />}
       {showSettings && <Settings />}
