@@ -80,7 +80,6 @@ export class GatewayClient {
       }
 
       this.ws.onmessage = (event) => {
-        console.log('[GW] ←', typeof event.data === 'string' ? event.data.slice(0, 200) : event.data)
         this.handleMessage(event.data)
       }
 
@@ -284,11 +283,29 @@ export class GatewayClient {
           } else {
             content = [{ type: 'text', text: String(m.content || '') }]
           }
+
+          // Strip gateway metadata from user messages
+          // Format: "Conversation info (untrusted metadata):\n{...json...}\n[timestamp] actual message"
+          if (m.role === 'user') {
+            content = content.map((c) => {
+              if (c.type !== 'text' || !c.text) return c
+              let text = c.text
+              // Strip "Conversation info..." header + JSON block + timestamp prefix
+              const timestampMatch = text.match(/\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+\w+\]\s*/)
+              if (timestampMatch && text.includes('Conversation info')) {
+                const idx = text.lastIndexOf(timestampMatch[0])
+                text = text.slice(idx + timestampMatch[0].length)
+              }
+              return { ...c, text: text.trim() }
+            }).filter((c) => c.text) // Remove empty content blocks
+          }
+
           return {
             role: m.role as 'user' | 'assistant',
             content,
           }
         })
+        .filter((m) => m.content.length > 0) // Remove messages that became empty after stripping
       this.callbacks.onHistoryLoaded(sessionKey, parsed)
     }
   }

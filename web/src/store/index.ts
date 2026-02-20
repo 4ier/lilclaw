@@ -65,11 +65,11 @@ export const useStore = create<AppState>()(
     (set, get) => {
       let client: GatewayClient | null = null
 
-      // Gateway uses internal session keys like "agent:dev:main"
-      // Normalize to the user-facing key (e.g. "main")
+      // Gateway uses internal session keys like "agent:dev:main" or "agent:<id>:<key>"
+      // Normalize to the user-facing key (strip "agent:<id>:" prefix)
       const normalizeSessionKey = (key: string): string => {
-        const prefix = 'agent:dev:'
-        return key.startsWith(prefix) ? key.slice(prefix.length) : key
+        const match = key.match(/^agent:[^:]+:(.+)$/)
+        return match ? match[1] : key
       }
 
       const initClient = () => {
