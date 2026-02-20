@@ -240,4 +240,120 @@ Emoji: 🐾 🦞 🚀 ✨ 🎵 💡 🔧 ⚡
     }],
     timestamp: Date.now() - 15000,
   },
+  {
+    role: 'user',
+    content: [{ type: 'text', text: '能直接渲染 AI 生成的代码吗？比如一个交互式组件' }],
+    timestamp: Date.now() - 12000,
+  },
+  {
+    role: 'assistant',
+    content: [{
+      type: 'text',
+      text: `当然可以！下面是一个交互式计数器：
+
+\`\`\`html
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; font-family: -apple-system, system-ui, sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
+  .counter { text-align: center; background: white; border-radius: 16px; padding: 24px 32px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+  .count { font-size: 48px; font-weight: 700; color: #4f46e5; margin: 12px 0; font-variant-numeric: tabular-nums; }
+  .buttons { display: flex; gap: 12px; }
+  button { border: none; border-radius: 10px; padding: 10px 20px; font-size: 18px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; }
+  button:active { transform: scale(0.95); }
+  .dec { background: #fee2e2; color: #dc2626; }
+  .dec:hover { background: #fecaca; }
+  .inc { background: #dbeafe; color: #2563eb; }
+  .inc:hover { background: #bfdbfe; }
+  .reset { background: #f3f4f6; color: #6b7280; font-size: 13px; margin-top: 8px; padding: 6px 16px; }
+</style>
+</head>
+<body>
+  <div class="counter">
+    <div style="font-size:13px;color:#888;letter-spacing:0.5px">COUNTER</div>
+    <div class="count" id="count">0</div>
+    <div class="buttons">
+      <button class="dec" onclick="update(-1)">−</button>
+      <button class="inc" onclick="update(1)">+</button>
+    </div>
+    <button class="reset" onclick="document.getElementById('count').textContent='0'">Reset</button>
+  </div>
+  <script>
+    function update(d) {
+      const el = document.getElementById('count');
+      el.textContent = parseInt(el.textContent) + d;
+    }
+  </script>
+</body>
+</html>
+\`\`\`
+
+再来一个 Canvas 动画：
+
+\`\`\`html
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { margin: 0; overflow: hidden; background: #0f0f0f; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = 200;
+
+  const particles = Array.from({length: 60}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    vx: (Math.random() - 0.5) * 1.5,
+    vy: (Math.random() - 0.5) * 1.5,
+    r: Math.random() * 2 + 1,
+  }));
+
+  function draw() {
+    ctx.fillStyle = 'rgba(15,15,15,0.15)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    particles.forEach((p, i) => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+      if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = \`hsl(\${(i * 6 + Date.now() * 0.02) % 360}, 70%, 65%)\`;
+      ctx.fill();
+
+      // Connect nearby particles
+      particles.slice(i + 1).forEach(q => {
+        const dx = p.x - q.x, dy = p.y - q.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 80) {
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(q.x, q.y);
+          ctx.strokeStyle = \`rgba(99, 102, 241, \${1 - dist / 80})\`;
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      });
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+</script>
+</body>
+</html>
+\`\`\`
+
+HTML 代码块超过 100 字符会自动渲染成可交互的 iframe。支持完整的 HTML/CSS/JS，在沙箱中运行（\`sandbox="allow-scripts"\`），安全隔离。`
+    }],
+    timestamp: Date.now() - 8000,
+  },
 ]

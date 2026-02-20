@@ -31,35 +31,87 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function HtmlSandbox({ html }: { html: string }) {
+  const [height, setHeight] = useState(200)
+
   const srcDoc = useMemo(() => {
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <style>
-            body { margin: 0; padding: 8px; font-family: system-ui, sans-serif; }
-          </style>
-        </head>
-        <body>${html}</body>
-      </html>
-    `
+    // If it's a full HTML document, use as-is
+    if (html.trim().startsWith('<!DOCTYPE') || html.trim().startsWith('<html')) {
+      // Inject resize observer script
+      return html.replace('</body>', `
+        <script>
+          const ro = new ResizeObserver(() => {
+            window.parent.postMessage({ type: 'iframe-resize', height: document.documentElement.scrollHeight }, '*')
+          });
+          ro.observe(document.body);
+          window.parent.postMessage({ type: 'iframe-resize', height: document.documentElement.scrollHeight }, '*')
+        </script>
+      </body>`)
+    }
+    // Fragment — wrap in a full document
+    return `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { padding: 12px; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 14px; line-height: 1.5; color: #1a1a1a; }
+</style>
+</head><body>${html}
+<script>
+  const ro = new ResizeObserver(() => {
+    window.parent.postMessage({ type: 'iframe-resize', height: document.documentElement.scrollHeight }, '*')
+  });
+  ro.observe(document.body);
+  window.parent.postMessage({ type: 'iframe-resize', height: document.documentElement.scrollHeight }, '*')
+</script>
+</body></html>`
   }, [html])
 
+  // Listen for resize messages from iframe
+  useMemo(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'iframe-resize' && typeof e.data.height === 'number') {
+        setHeight(Math.min(Math.max(e.data.height + 4, 60), 600))
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
+
   return (
-    <iframe
-      srcDoc={srcDoc}
-      sandbox="allow-scripts"
-      className="w-full min-h-[200px] border border-gray-300 dark:border-gray-600 rounded-lg bg-white"
-      title="HTML content"
-    />
+    <div className="my-2 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+        <span className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
+        <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/80" />
+        <span className="w-2.5 h-2.5 rounded-full bg-green-400/80" />
+        <span className="ml-2 text-[10px] text-gray-400 uppercase tracking-wider">Preview</span>
+      </div>
+      <iframe
+        srcDoc={srcDoc}
+        sandbox="allow-scripts"
+        style={{ height: `${height}px` }}
+        className="w-full bg-white block"
+        title="HTML content"
+      />
+    </div>
   )
 }
 
+function extractText(node: React.ReactNode): string {
+  if (typeof node === 'string') return node
+  if (typeof node === 'number') return String(node)
+  if (!node) return ''
+  if (Array.isArray(node)) return node.map(extractText).join('')
+  if (typeof node === 'object' && 'props' in (node as object)) {
+    const el = node as { props?: { children?: React.ReactNode } }
+    return extractText(el.props?.children)
+  }
+  return ''
+}
+
 function CodeBlock({ className, children }: { className?: string; children: React.ReactNode }) {
-  const code = String(children).replace(/\n$/, '')
-  const language = className?.replace('language-', '') || ''
+  const code = extractText(children).replace(/\n$/, '')
+  const language = (className || '').replace('language-', '').replace('hljs ', '').trim()
 
   // Detect HTML code blocks that should be rendered
   const isHtmlRender = language === 'html' && code.includes('<')
