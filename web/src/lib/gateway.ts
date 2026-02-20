@@ -17,11 +17,19 @@ export interface AgentEvent {
   data?: unknown
 }
 
+export interface SessionInfo {
+  key: string
+  label?: string
+  displayName?: string
+  lastActivity?: number
+}
+
 export interface GatewayCallbacks {
   onConnectionChange: (state: ConnectionState) => void
   onChatEvent: (sessionKey: string, state: 'delta' | 'final', content: MessageContent[]) => void
   onAgentEvent: (sessionKey: string, event: AgentEvent) => void
   onHistoryLoaded: (sessionKey: string, messages: ChatMessage[]) => void
+  onSessionsLoaded: (sessions: SessionInfo[]) => void
   onError: (error: string) => void
 }
 
@@ -284,5 +292,16 @@ export class GatewayClient {
 
   async abortChat(sessionKey: string): Promise<void> {
     await this.sendRequest('chat.abort', { sessionKey })
+  }
+
+  async listSessions(): Promise<void> {
+    const result = await this.sendRequest('sessions.list', {}) as { sessions?: SessionInfo[] } | undefined
+    if (result?.sessions) {
+      this.callbacks.onSessionsLoaded(result.sessions)
+    }
+  }
+
+  async patchSession(key: string, patch: { label?: string }): Promise<void> {
+    await this.sendRequest('sessions.patch', { key, ...patch })
   }
 }

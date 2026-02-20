@@ -72,11 +72,13 @@ export default function ChatScreen() {
   const {
     messages,
     streaming,
+    typing,
     currentSessionKey,
     connectionState,
     sendMessage,
     setShowDrawer,
     setShowSettings,
+    getSessionDisplayName,
   } = useStore()
 
   const [input, setInput] = useState('')
@@ -86,11 +88,13 @@ export default function ChatScreen() {
 
   const currentMessages = messages[currentSessionKey] || []
   const currentStreaming = streaming[currentSessionKey]
+  const isTyping = typing[currentSessionKey] || false
+  const displayName = getSessionDisplayName(currentSessionKey)
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [currentMessages, currentStreaming])
+  }, [currentMessages, currentStreaming, isTyping])
 
   // Focus input on mount
   useEffect(() => {
@@ -135,8 +139,8 @@ export default function ChatScreen() {
         </button>
 
         <div className="flex flex-col items-center">
-          <h1 className="font-semibold text-[15px] text-gray-900 dark:text-white">
-            {currentSessionKey}
+          <h1 className="font-semibold text-[15px] text-gray-900 dark:text-white truncate max-w-[200px]">
+            {displayName}
           </h1>
           <ConnectionIndicator />
         </div>
@@ -184,6 +188,18 @@ export default function ChatScreen() {
             content={currentStreaming.content}
             isStreaming
           />
+        )}
+
+        {isTyping && !currentStreaming?.isStreaming && (
+          <div className="flex justify-start animate-fade-in">
+            <div className="message-bubble message-bubble-assistant">
+              <div className="flex items-center gap-1 py-1 px-0.5">
+                <span className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce [animation-delay:0ms]" />
+                <span className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce [animation-delay:150ms]" />
+                <span className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce [animation-delay:300ms]" />
+              </div>
+            </div>
+          </div>
         )}
 
         <div ref={messagesEndRef} />

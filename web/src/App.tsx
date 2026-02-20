@@ -15,6 +15,11 @@ export default function App() {
       // Load mock data for testing rendering
       useStore.setState((state) => ({
         connectionState: 'connected',
+        sessions: [
+          { key: 'main', label: '聊天 UI 渲染测试' },
+          { key: 'coding', label: '写一个 Todo App' },
+          { key: 'research' },
+        ],
         messages: {
           ...state.messages,
           main: mockConversation,

@@ -6,6 +6,7 @@ import {
   type ChatMessage,
   type MessageContent,
   type AgentEvent,
+  type SessionInfo,
 } from '../lib/gateway'
 
 interface StreamingContent {
@@ -21,12 +22,15 @@ interface AppState {
 
   // Sessions
   currentSessionKey: string
-  sessions: string[]
+  sessions: SessionInfo[]
 
   // Messages
   messages: Record<string, ChatMessage[]>
   streaming: Record<string, StreamingContent>
   agentState: Record<string, AgentEvent | null>
+
+  // Typing: user sent message, waiting for first response
+  typing: Record<string, boolean>
 
   // UI
   showDrawer: boolean
@@ -44,11 +48,16 @@ interface AppState {
   switchSession: (sessionKey: string) => void
   createSession: (sessionKey: string) => void
   loadHistory: () => Promise<void>
+  loadSessions: () => Promise<void>
+  renameSession: (key: string, label: string) => Promise<void>
 
   setShowDrawer: (show: boolean) => void
   setShowSettings: (show: boolean) => void
   setTheme: (theme: 'system' | 'light' | 'dark') => void
   updateSettings: (port: number, token: string) => void
+
+  // Helpers
+  getSessionDisplayName: (key: string) => string
 }
 
 export const useStore = create<AppState>()(
@@ -63,12 +72,14 @@ export const useStore = create<AppState>()(
             onConnectionChange: (connectionState) => {
               set({ connectionState })
               if (connectionState === 'connected') {
+                get().loadSessions()
                 get().loadHistory()
               }
             },
             onChatEvent: (sessionKey, eventState, content) => {
               if (eventState === 'delta') {
                 set((state) => ({
+                  typing: { ...state.typing, [sessionKey]: false },
                   streaming: {
                     ...state.streaming,
                     [sessionKey]: { content, isStreaming: true },
@@ -94,6 +105,7 @@ export const useStore = create<AppState>()(
                       ...state.agentState,
                       [sessionKey]: null,
                     },
+                    typing: { ...state.typing, [sessionKey]: false },
                   }
                 })
               }
@@ -104,6 +116,8 @@ export const useStore = create<AppState>()(
                   ...state.agentState,
                   [sessionKey]: event,
                 },
+                // Any agent event means we're past the "waiting" phase
+                typing: { ...state.typing, [sessionKey]: false },
               }))
             },
             onHistoryLoaded: (sessionKey, messages) => {
@@ -113,6 +127,9 @@ export const useStore = create<AppState>()(
                   [sessionKey]: messages,
                 },
               }))
+            },
+            onSessionsLoaded: (sessions) => {
+              set({ sessions })
             },
             onError: (error) => {
               console.error('Gateway error:', error)
@@ -130,10 +147,11 @@ export const useStore = create<AppState>()(
         gatewayPort: 3000,
         authToken: 'lilclaw-local',
         currentSessionKey: 'main',
-        sessions: ['main'],
+        sessions: [],
         messages: {},
         streaming: {},
         agentState: {},
+        typing: {},
         showDrawer: false,
         showSettings: false,
         theme: 'system',
@@ -169,9 +187,24 @@ export const useStore = create<AppState>()(
                 userMessage,
               ],
             },
+            // Show typing indicator immediately
+            typing: { ...state.typing, [currentSessionKey]: true },
           }))
 
           await client?.sendMessage(currentSessionKey, message)
+
+          // Auto-name session: if this is the first user message and session has no label
+          const state = get()
+          const sessionMessages = state.messages[currentSessionKey] || []
+          const userMessages = sessionMessages.filter((m) => m.role === 'user')
+          const sessionInfo = state.sessions.find((s) => s.key === currentSessionKey)
+          if (userMessages.length === 1 && !sessionInfo?.label) {
+            // Take first 30 chars of the message as label
+            const label = message.length > 30 ? message.slice(0, 30) + '…' : message
+            client?.patchSession(currentSessionKey, { label }).then(() => {
+              get().loadSessions()
+            }).catch(() => {})
+          }
         },
 
         abortChat: async () => {
@@ -186,7 +219,7 @@ export const useStore = create<AppState>()(
 
         createSession: (sessionKey: string) => {
           set((state) => ({
-            sessions: [...new Set([...state.sessions, sessionKey])],
+            sessions: [...state.sessions.filter((s) => s.key !== sessionKey), { key: sessionKey }],
             currentSessionKey: sessionKey,
             showDrawer: false,
           }))
@@ -195,6 +228,15 @@ export const useStore = create<AppState>()(
         loadHistory: async () => {
           const { currentSessionKey } = get()
           await client?.loadHistory(currentSessionKey)
+        },
+
+        loadSessions: async () => {
+          await client?.listSessions()
+        },
+
+        renameSession: async (key: string, label: string) => {
+          await client?.patchSession(key, { label })
+          await get().loadSessions()
         },
 
         setShowDrawer: (show: boolean) => set({ showDrawer: show }),
@@ -218,6 +260,13 @@ export const useStore = create<AppState>()(
           client?.disconnect()
           client?.connect()
         },
+
+        getSessionDisplayName: (key: string) => {
+          const session = get().sessions.find((s) => s.key === key)
+          if (session?.label?.trim()) return session.label.trim()
+          if (session?.displayName?.trim()) return session.displayName.trim()
+          return key
+        },
       }
     },
     {
@@ -226,7 +275,6 @@ export const useStore = create<AppState>()(
         gatewayPort: state.gatewayPort,
         authToken: state.authToken,
         currentSessionKey: state.currentSessionKey,
-        sessions: state.sessions,
         theme: state.theme,
       }),
     }
