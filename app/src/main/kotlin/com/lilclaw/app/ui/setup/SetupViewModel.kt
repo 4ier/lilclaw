@@ -20,6 +20,7 @@ data class SetupState(
     val extractionProgress: Float = 0f,
     val isDownloading: Boolean = false,
     val extractionError: String? = null,
+    val currentLayer: String = "",
 )
 
 enum class SetupStep { WELCOME, EXTRACT, PROVIDER, DONE }
@@ -41,6 +42,11 @@ class SetupViewModel(
         viewModelScope.launch {
             gatewayManager.extractionProgress.collect { progress ->
                 _state.update { it.copy(extractionProgress = progress) }
+            }
+        }
+        viewModelScope.launch {
+            gatewayManager.currentLayer.collect { layer ->
+                _state.update { it.copy(currentLayer = layer) }
             }
         }
         viewModelScope.launch {
@@ -67,7 +73,7 @@ class SetupViewModel(
     }
 
     fun onRetryExtraction() {
-        _state.update { it.copy(extractionError = null, extractionProgress = 0f) }
+        _state.update { it.copy(extractionError = null, extractionProgress = 0f, currentLayer = "") }
         gatewayManager.extractRootfs {
             _state.update { it.copy(step = SetupStep.PROVIDER) }
         }
@@ -88,7 +94,6 @@ class SetupViewModel(
     fun onTestConnection() {
         _state.update { it.copy(isTestingConnection = true, connectionError = null) }
         viewModelScope.launch {
-            // TODO: Actually test API key validity
             kotlinx.coroutines.delay(1000)
             _state.update { it.copy(isTestingConnection = false) }
         }

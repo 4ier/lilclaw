@@ -4,18 +4,14 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.lilclaw.app.ui.chat.ChatScreen
 import com.lilclaw.app.ui.settings.SettingsScreen
 import com.lilclaw.app.ui.setup.SetupScreen
-import com.lilclaw.app.ui.topics.TopicsScreen
+import com.lilclaw.app.ui.webview.WebViewScreen
 
 object Routes {
     const val SETUP = "setup"
-    const val TOPICS = "topics"
-    const val CHAT = "chat/{topicId}"
+    const val WEBVIEW = "webview"
     const val SETTINGS = "settings"
-
-    fun chat(topicId: String) = "chat/$topicId"
 }
 
 @Composable
@@ -29,29 +25,18 @@ fun AppNavigation() {
         composable(Routes.SETUP) {
             SetupScreen(
                 onSetupComplete = {
-                    navController.navigate(Routes.TOPICS) {
+                    navController.navigate(Routes.WEBVIEW) {
                         popUpTo(Routes.SETUP) { inclusive = true }
                     }
                 }
             )
         }
 
-        composable(Routes.TOPICS) {
-            TopicsScreen(
-                onTopicSelected = { topicId ->
-                    navController.navigate(Routes.chat(topicId))
-                },
+        composable(Routes.WEBVIEW) {
+            WebViewScreen(
                 onSettingsClick = {
                     navController.navigate(Routes.SETTINGS)
                 }
-            )
-        }
-
-        composable(Routes.CHAT) { backStackEntry ->
-            val topicId = backStackEntry.arguments?.getString("topicId") ?: return@composable
-            ChatScreen(
-                topicId = topicId,
-                onBack = { navController.popBackStack() }
             )
         }
 

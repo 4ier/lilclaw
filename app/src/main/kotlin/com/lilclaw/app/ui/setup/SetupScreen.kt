@@ -3,12 +3,14 @@ package com.lilclaw.app.ui.setup
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -29,8 +31,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.lilclaw.app.service.GatewayManager
 import org.koin.androidx.compose.koinViewModel
 
 private val PROVIDERS = listOf("OpenAI", "Anthropic", "DeepSeek", "AWS Bedrock", "Custom")
@@ -63,6 +67,7 @@ fun SetupScreen(
                     SetupStep.EXTRACT -> ExtractStep(
                         progress = state.extractionProgress,
                         isDownloading = state.isDownloading,
+                        currentLayer = state.currentLayer,
                         error = state.extractionError,
                         onRetry = viewModel::onRetryExtraction,
                     )
@@ -117,7 +122,13 @@ private fun WelcomeStep(onNext: () -> Unit) {
 }
 
 @Composable
-private fun ExtractStep(progress: Float, isDownloading: Boolean, error: String? = null, onRetry: () -> Unit = {}) {
+private fun ExtractStep(
+    progress: Float,
+    isDownloading: Boolean,
+    currentLayer: String = "",
+    error: String? = null,
+    onRetry: () -> Unit = {},
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -141,17 +152,101 @@ private fun ExtractStep(progress: Float, isDownloading: Boolean, error: String? 
                 Text("Retry")
             }
         } else {
+            val layerLabel = when (currentLayer) {
+                "base" -> "Base system"
+                "openclaw" -> "AI engine"
+                "chatspa" -> "Chat UI"
+                "setup" -> "Finishing setup"
+                else -> "Preparing"
+            }
+
+            val layerSize = GatewayManager.LAYERS.find { it.name == currentLayer }?.displaySize
+
             Text(
-                text = if (isDownloading) "Downloading environment..." else "Extracting environment...",
+                text = if (isDownloading) "Downloading..." else "Extracting...",
                 style = MaterialTheme.typography.titleLarge,
             )
             Spacer(Modifier.height(8.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = layerLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                if (layerSize != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "($layerSize)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
             Text(
-                text = if (isDownloading) "~290 MB — one-time download" else "Preparing Alpine Linux + Node.js",
-                style = MaterialTheme.typography.bodyMedium,
+                text = "Total ~73 MB — one-time download",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
             Spacer(Modifier.height(24.dp))
+
+            // Layer progress indicators
+            Column(modifier = Modifier.fillMaxWidth(0.8f)) {
+                for (layer in GatewayManager.LAYERS) {
+                    val layerDone = when {
+                        currentLayer == "setup" -> true
+                        currentLayer == "" && progress >= 1f -> true
+                        GatewayManager.LAYERS.indexOf(layer) <
+                                GatewayManager.LAYERS.indexOfFirst { it.name == currentLayer } -> true
+                        else -> false
+                    }
+                    val isCurrent = layer.name == currentLayer
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = when {
+                                layerDone -> "✓"
+                                isCurrent -> "●"
+                                else -> "○"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (layerDone) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.width(20.dp),
+                        )
+                        Text(
+                            text = when (layer.name) {
+                                "base" -> "Base system"
+                                "openclaw" -> "AI engine"
+                                "chatspa" -> "Chat UI"
+                                else -> layer.name
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = if (isCurrent) FontWeight.Medium else FontWeight.Normal,
+                            color = if (isCurrent) MaterialTheme.colorScheme.onSurface
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = layer.displaySize,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier.fillMaxWidth(0.8f),
