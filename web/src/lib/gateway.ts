@@ -80,6 +80,7 @@ export class GatewayClient {
       }
 
       this.ws.onmessage = (event) => {
+        console.log('[GW] ←', typeof event.data === 'string' ? event.data.slice(0, 200) : event.data)
         this.handleMessage(event.data)
       }
 

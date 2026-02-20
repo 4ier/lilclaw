@@ -65,6 +65,13 @@ export const useStore = create<AppState>()(
     (set, get) => {
       let client: GatewayClient | null = null
 
+      // Gateway uses internal session keys like "agent:dev:main"
+      // Normalize to the user-facing key (e.g. "main")
+      const normalizeSessionKey = (key: string): string => {
+        const prefix = 'agent:dev:'
+        return key.startsWith(prefix) ? key.slice(prefix.length) : key
+      }
+
       const initClient = () => {
         const state = get()
         client = new GatewayClient(
@@ -76,7 +83,8 @@ export const useStore = create<AppState>()(
                 get().loadHistory()
               }
             },
-            onChatEvent: (sessionKey, eventState, content) => {
+            onChatEvent: (rawSessionKey, eventState, content) => {
+              const sessionKey = normalizeSessionKey(rawSessionKey)
               if (eventState === 'delta') {
                 set((state) => ({
                   typing: { ...state.typing, [sessionKey]: false },
@@ -110,7 +118,8 @@ export const useStore = create<AppState>()(
                 })
               }
             },
-            onAgentEvent: (sessionKey, event) => {
+            onAgentEvent: (rawSessionKey, event) => {
+              const sessionKey = normalizeSessionKey(rawSessionKey)
               set((state) => ({
                 agentState: {
                   ...state.agentState,
