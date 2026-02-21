@@ -58,9 +58,9 @@ class GatewayManager(private val context: Context) {
                 33_380_716L, "32 MB"
             ),
             LayerInfo(
-                "chatspa", "chatspa-0.3.6.tar.gz",
-                "$RELEASES_BASE/chatspa-0.3.6.tar.gz",
-                236355L, "230 KB"
+                "chatspa", "chatspa-0.3.7.tar.gz",
+                "$RELEASES_BASE/chatspa-0.3.7.tar.gz",
+                237044L, "231 KB"
             ),
         )
     }
