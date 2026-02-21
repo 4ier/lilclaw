@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -68,7 +68,7 @@ function HtmlSandbox({ html }: { html: string }) {
   }, [html])
 
   // Listen for resize messages from iframe
-  useMemo(() => {
+  useEffect(() => {
     const handler = (e: MessageEvent) => {
       if (e.data?.type === 'iframe-resize' && typeof e.data.height === 'number') {
         setHeight(Math.min(Math.max(e.data.height + 4, 60), 600))

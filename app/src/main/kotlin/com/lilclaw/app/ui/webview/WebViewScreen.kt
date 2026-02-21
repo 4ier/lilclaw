@@ -126,6 +126,11 @@ fun WebViewScreen(
                 // Set initial --kb-height before page loads
                 clearCache(true)
                 loadUrl(buildUrl())
+
+                // Inject app version into WebView globals after page loads
+                val appVersion = com.lilclaw.app.BuildConfig.VERSION_NAME
+                evaluateJavascript("window.__LILCLAW_VERSION='$appVersion'", null)
+
                 webView = this
             }
         },

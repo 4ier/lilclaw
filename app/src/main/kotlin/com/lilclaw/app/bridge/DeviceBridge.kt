@@ -88,7 +88,7 @@ class DeviceBridge(private val context: Context) {
                             put("device", android.os.Build.MODEL)
                             put("manufacturer", android.os.Build.MANUFACTURER)
                             put("sdk", android.os.Build.VERSION.SDK_INT)
-                            put("app_version", "0.1.0")
+                            put("app_version", com.lilclaw.app.BuildConfig.VERSION_NAME)
                         })
                     }
                     else -> {

@@ -19,15 +19,15 @@ rootfs/                          ← base layer 解压目标
         └── serve-ui.cjs         ← 静态文件服务器 (port 3001)
 ```
 
-## Layer Packages (GitHub Releases: `layers-v2`)
+## Layer Packages (GitHub Releases: `layers-v3`)
 
-| Layer    | File                          | Compressed | Uncompressed | Contents                              |
-|----------|-------------------------------|------------|--------------|---------------------------------------|
-| base     | base-arm64-2.0.0.tar.gz      | 41MB       | ~130MB       | Alpine 3.23.3 + Node 24.13.0 + npm + git |
-| openclaw | openclaw-2026.2.17.tar.gz    | 32MB       | ~214MB       | OpenClaw 2026.2.17 (pruned, koffi fixed) |
-| chatspa  | chatspa-0.3.0.tar.gz         | 231KB      | ~730KB       | Chat SPA + serve-ui.cjs               |
+| Layer    | File                                   | Compressed | Uncompressed | Contents                              |
+|----------|----------------------------------------|------------|--------------|---------------------------------------|
+| base     | base-arm64-2.0.0.tar.gz               | 41MB       | ~130MB       | Alpine 3.23.3 + Node 24.13.0 + npm + git |
+| openclaw | openclaw-2026.2.17-bundled.tar.gz      | 42MB       | ~253MB       | OpenClaw 2026.2.17 (pruned, koffi fixed, esbuild bundled) |
+| chatspa  | chatspa-0.3.7.tar.gz                   | 231KB      | ~730KB       | Chat SPA + serve-ui.cjs               |
 
-**Total: ~73MB** (was 289MB monolithic)
+**Total: ~83MB** (was 73MB unbundled — slightly larger due to bundle file, but 3x faster startup)
 
 ## CRITICAL: koffi SIGSEGV Fix
 
@@ -42,6 +42,21 @@ koffi's loader will fall back to `musl_arm64/koffi.node` automatically.
 
 Root cause: `process.platform` returns `linux` under proot → koffi loads `linux_arm64` 
 (glibc) instead of `musl_arm64` → dlopen corrupts memory → SIGSEGV during V8 JIT.
+
+## esbuild Bundle Optimization
+
+Gateway startup on ARM64 proot was ~20s due to Node.js loading 2841 separate JS files.
+After bundling with esbuild into a single `entry.bundled.min.mjs` (~17MB), startup drops to ~6.4s (3x faster).
+
+**How it works:**
+- `esbuild` bundles `dist/entry.js` + all resolvable dependencies into one ESM file
+- CJS polyfill banner provides `require()`, `__filename`, `__dirname` for mixed CJS/ESM deps
+- Native modules are `--external` (better-sqlite3, koffi, sharp, etc.) — loaded at runtime
+- `openclaw.mjs` entry point is rewritten to `import "./dist/entry.bundled.min.mjs"`
+
+**Removed extensions** (incompatible with bundle due to babel.cjs dependency):
+- `extensions/device-pair` — not needed on Android (native bridge handles pairing)
+- `extensions/memory-core` — optional, can be re-added when babel issue is resolved
 
 ## Build Strategy
 

@@ -119,6 +119,46 @@ echo "Size after prune: $(du -sh /usr/local/lib/node_modules/openclaw | cut -f1)
 openclaw --version
 '
 
+# ── Step 6b: esbuild bundle for fast startup ──
+echo "[6b/8] Building esbuild bundle (3x faster startup)..."
+proot_exec '
+cd /usr/local/lib/node_modules/openclaw
+
+# Remove extensions that need babel (incompatible with bundle)
+rm -rf extensions/device-pair extensions/memory-core
+
+# Install esbuild temporarily
+npm install esbuild --no-save 2>/dev/null
+
+# Bundle with CJS require polyfill
+BANNER='"'"'import{createRequire as __cr}from"module";import{fileURLToPath as __fu}from"url";import{dirname as __dn}from"path";const require=__cr(import.meta.url);const __filename=__fu(import.meta.url);const __dirname=__dn(__filename);'"'"'
+
+npx esbuild dist/entry.js \
+  --bundle --minify --tree-shaking=true \
+  --platform=node --format=esm \
+  --outfile=dist/entry.bundled.min.mjs \
+  --banner:js="$BANNER" \
+  --external:better-sqlite3 --external:koffi --external:sharp \
+  --external:@napi-rs/* --external:playwright-core --external:chromium-bidi \
+  --external:pdfjs-dist --external:cpu-features --external:bufferutil \
+  --external:utf-8-validate --external:node-llama-cpp --external:canvas \
+  --log-level=warning
+
+# Patch openclaw.mjs to use bundled entry
+cat > /usr/local/lib/node_modules/openclaw/openclaw.mjs << '"'"'ENTRY'"'"'
+#!/usr/bin/env node
+import "./dist/entry.bundled.min.mjs";
+ENTRY
+
+# Remove esbuild (save space)
+rm -rf node_modules/esbuild node_modules/@esbuild
+
+echo "Bundle size: $(du -sh dist/entry.bundled.min.mjs | cut -f1)"
+echo "Bundled --version test:"
+cd /
+openclaw --version
+'
+
 # ── Step 7: Package openclaw layer ──
 echo "[7/8] Packaging openclaw layer..."
 $ADB shell "

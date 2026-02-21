@@ -48,7 +48,7 @@ class GatewayClient {
     companion object {
         private const val TAG = "GatewayClient"
         private const val PROTOCOL_VERSION = 3
-        private const val CLIENT_VERSION = "0.2.0"
+        val CLIENT_VERSION: String get() = com.lilclaw.app.BuildConfig.VERSION_NAME
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

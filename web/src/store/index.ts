@@ -272,9 +272,10 @@ export const useStore = create<AppState>()(
 
         getSessionDisplayName: (key: string) => {
           const session = get().sessions.find((s) => s.key === key)
-          if (session?.label?.trim()) return session.label.trim()
-          if (session?.displayName?.trim()) return session.displayName.trim()
-          return key
+          const raw = session?.label?.trim() || session?.displayName?.trim() || key
+          if (raw === 'main') return 'LilClaw'
+          if (/^chat-\d+$/.test(raw)) return 'New Chat'
+          return raw
         },
       }
     },

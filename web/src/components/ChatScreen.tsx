@@ -73,13 +73,7 @@ export default function ChatScreen() {
   const currentMessages = messages[currentSessionKey] || []
   const currentStreaming = streaming[currentSessionKey]
   const isTyping = typing[currentSessionKey] || false
-  const rawDisplayName = getSessionDisplayName(currentSessionKey)
-  // Clean up display: "main" → "LilClaw", "chat-NNNNN" → "New Chat"
-  const displayName = rawDisplayName === 'main'
-    ? 'LilClaw'
-    : /^chat-\d+$/.test(rawDisplayName)
-      ? 'New Chat'
-      : rawDisplayName
+  const displayName = getSessionDisplayName(currentSessionKey)
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {

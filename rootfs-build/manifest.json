@@ -8,9 +8,9 @@
     },
     {
       "name": "openclaw",
-      "file": "openclaw-2026.2.17.tar.gz",
+      "file": "openclaw-2026.2.17-bundled.tar.gz",
       "version": "2026.2.17",
-      "size": 32088977
+      "size": 43335483
     },
     {
       "name": "chatspa",

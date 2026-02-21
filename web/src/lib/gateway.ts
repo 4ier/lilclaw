@@ -200,12 +200,13 @@ export class GatewayClient {
   }
 
   private sendConnectRequest() {
+    const version = (window as unknown as Record<string, string>).__LILCLAW_VERSION || '0.0.0'
     this.sendRequest('connect', {
       minProtocol: 3,
       maxProtocol: 3,
       client: {
         id: 'openclaw-control-ui',
-        version: '0.1.0',
+        version,
         platform: 'android',
         mode: 'webchat',
       },
@@ -214,7 +215,7 @@ export class GatewayClient {
       caps: [],
       auth: { token: this.token },
       locale: 'en-US',
-      userAgent: 'lilclaw-chat/0.1.0',
+      userAgent: `lilclaw-chat/${version}`,
     }).then(() => {
       this.callbacks.onConnectionChange('connected')
     }).catch((err) => {

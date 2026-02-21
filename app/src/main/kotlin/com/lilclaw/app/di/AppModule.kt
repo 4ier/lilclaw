@@ -1,7 +1,6 @@
 package com.lilclaw.app.di
 
 import com.lilclaw.app.data.GatewayClient
-import com.lilclaw.app.data.MessageRepository
 import com.lilclaw.app.data.SettingsRepository
 import com.lilclaw.app.service.GatewayManager
 import com.lilclaw.app.ui.settings.SettingsViewModel
@@ -14,7 +13,6 @@ val appModule = module {
     single { SettingsRepository(androidContext()) }
     single { GatewayManager(androidContext()) }
     single { GatewayClient() }
-    single { MessageRepository(get()) }
 
     viewModel { SetupViewModel(get(), get()) }
     viewModel { SettingsViewModel(get(), get()) }

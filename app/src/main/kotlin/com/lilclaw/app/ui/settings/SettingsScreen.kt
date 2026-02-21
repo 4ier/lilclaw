@@ -138,7 +138,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("About", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
-                    Text("LilClaw (小爪子) v0.3.2", style = MaterialTheme.typography.bodyMedium)
+                    Text("LilClaw (小爪子) v${com.lilclaw.app.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium)
                     Text(
                         "Powered by OpenClaw",
                         style = MaterialTheme.typography.bodySmall,
