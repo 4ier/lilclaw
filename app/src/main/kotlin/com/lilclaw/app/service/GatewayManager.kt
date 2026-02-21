@@ -36,6 +36,7 @@ data class LayerInfo(
     val fallbackUrl: String,     // network fallback
     val sizeBytes: Long,
     val displaySize: String,
+    val version: String = assetFile.removeSuffix(".tar.gz").substringAfterLast("-"),
 )
 
 class GatewayManager(private val context: Context) {
@@ -91,6 +92,20 @@ class GatewayManager(private val context: Context) {
         get() = layersJson.exists()
                 && File(rootfsDir, "usr/bin/node").exists()
                 && File(rootfsDir, "usr/local/bin/openclaw").exists()
+
+    /** Returns layers whose installed version doesn't match LAYERS definition. */
+    private fun getStaleLayers(): List<LayerInfo> {
+        if (!layersJson.exists()) return LAYERS
+        return try {
+            val installed = JSONObject(layersJson.readText())
+            LAYERS.filter { layer ->
+                val obj = installed.optJSONObject(layer.name)
+                obj == null || obj.optString("version") != layer.version
+            }
+        } catch (e: Exception) {
+            LAYERS
+        }
+    }
 
     private fun log(msg: String) {
         Log.i(TAG, msg)
@@ -180,6 +195,26 @@ class GatewayManager(private val context: Context) {
                 if (!isRootfsReady) {
                     _state.value = GatewayState.Error("Rootfs not ready")
                     return@launch
+                }
+
+                // Check for layer updates (e.g. chatspa version bump in new APK)
+                val stale = getStaleLayers()
+                if (stale.isNotEmpty()) {
+                    log("Updating ${stale.joinToString { it.name }}...")
+                    for (layer in stale) {
+                        val tarGzFile = File(context.cacheDir, "${layer.name}.tar.gz")
+                        val hasAsset = hasAssetFile("rootfs/${layer.assetFile}")
+                        if (hasAsset) {
+                            copyAssetToFile("rootfs/${layer.assetFile}", tarGzFile)
+                        } else {
+                            log("Downloading ${layer.name} (${layer.displaySize})...")
+                            downloadFile(layer.fallbackUrl, tarGzFile) { }
+                        }
+                        extractTarGz(tarGzFile, rootfsDir)
+                        tarGzFile.delete()
+                        log("${layer.name} updated ✓")
+                    }
+                    writeLayersJson()
                 }
 
                 if (provider.isNotEmpty()) {
@@ -509,15 +544,11 @@ class GatewayManager(private val context: Context) {
 
     private fun writeLayersJson() {
         val now = java.time.Instant.now().toString()
-        val json = JSONObject().apply {
-            put("base", JSONObject().apply {
-                put("version", "2.0.0"); put("installedAt", now)
-            })
-            put("openclaw", JSONObject().apply {
-                put("version", "2026.2.17"); put("installedAt", now)
-            })
-            put("chatspa", JSONObject().apply {
-                put("version", "0.3.0"); put("installedAt", now)
+        val json = JSONObject()
+        for (layer in LAYERS) {
+            json.put(layer.name, JSONObject().apply {
+                put("version", layer.version)
+                put("installedAt", now)
             })
         }
         layersJson.writeText(json.toString(2))
