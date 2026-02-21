@@ -12,7 +12,6 @@ export default function App() {
 
   useEffect(() => {
     if (USE_MOCK) {
-      // Load mock data for testing rendering
       useStore.setState((state) => ({
         connectionState: 'connected',
         sessions: [
@@ -31,7 +30,7 @@ export default function App() {
   }, [connect])
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden bg-white dark:bg-gray-900">
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-white dark:bg-[#1a1410]">
       <ChatScreen />
       {showDrawer && <SessionDrawer />}
       {showSettings && <Settings />}

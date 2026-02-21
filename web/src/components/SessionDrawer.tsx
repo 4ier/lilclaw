@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useStore } from '../store'
 
 export default function SessionDrawer() {
@@ -11,17 +11,7 @@ export default function SessionDrawer() {
     getSessionDisplayName,
   } = useStore()
 
-  const [newSessionName, setNewSessionName] = useState('')
-  const [showNewInput, setShowNewInput] = useState(false)
   const drawerRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  // Focus input when shown
-  useEffect(() => {
-    if (showNewInput) {
-      inputRef.current?.focus()
-    }
-  }, [showNewInput])
 
   // Close on click outside
   useEffect(() => {
@@ -42,23 +32,6 @@ export default function SessionDrawer() {
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
   }, [setShowDrawer])
-
-  const handleCreateSession = () => {
-    const name = newSessionName.trim()
-    if (name && !sessions.find((s) => s.key === name)) {
-      createSession(name)
-      setNewSessionName('')
-      setShowNewInput(false)
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleCreateSession()
-    else if (e.key === 'Escape') {
-      setShowNewInput(false)
-      setNewSessionName('')
-    }
-  }
 
   // If sessions list is empty (e.g. not connected), show at least current
   const displaySessions = sessions.length > 0
@@ -139,36 +112,19 @@ export default function SessionDrawer() {
 
         {/* New session */}
         <div className="border-t border-gray-100 dark:border-gray-800 p-3 safe-bottom">
-          {showNewInput ? (
-            <div className="flex gap-2">
-              <input
-                ref={inputRef}
-                type="text"
-                value={newSessionName}
-                onChange={(e) => setNewSessionName(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Name your chat"
-                className="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#231c14] text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-700/40"
-              />
-              <button
-                onClick={handleCreateSession}
-                disabled={!newSessionName.trim()}
-                className="px-3.5 py-2 rounded-xl bg-amber-800 text-white text-sm font-medium disabled:opacity-30 hover:bg-amber-900 active:scale-95 transition-all"
-              >
-                Add
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowNewInput(true)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-sm hover:border-amber-500 hover:text-amber-700 dark:hover:border-amber-600 dark:hover:text-amber-500 transition-all active:scale-[0.98] touch-target"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              <span>New session</span>
-            </button>
-          )}
+          <button
+            onClick={() => {
+              const key = `chat-${Date.now()}`
+              createSession(key)
+              setShowDrawer(false)
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-sm hover:border-amber-500 hover:text-amber-700 dark:hover:border-amber-600 dark:hover:text-amber-500 transition-all active:scale-[0.98] touch-target"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>New chat</span>
+          </button>
         </div>
       </div>
 

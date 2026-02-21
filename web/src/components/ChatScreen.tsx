@@ -95,6 +95,20 @@ export default function ChatScreen() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [currentMessages, currentStreaming, isTyping])
 
+  // Scroll to bottom when virtual keyboard opens/closes (viewport resize)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const handleResize = () => {
+      // Small delay to let layout settle after keyboard animation
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    }
+    vv.addEventListener('resize', handleResize)
+    return () => vv.removeEventListener('resize', handleResize)
+  }, [])
+
   // Focus input on mount
   useEffect(() => {
     inputRef.current?.focus()
@@ -214,6 +228,10 @@ export default function ChatScreen() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          onFocus={() => {
+            // Scroll messages to bottom when keyboard opens
+            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 300)
+          }}
           placeholder="Message..."
           rows={1}
           className="flex-1 resize-none px-3.5 py-2.5 rounded-[20px] border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#231c14] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-700/40 dark:focus:ring-amber-600/40 focus:border-amber-400 dark:focus:border-amber-700 transition-all text-[15px]"
