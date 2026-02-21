@@ -142,11 +142,13 @@ class GatewayManager(private val context: Context) {
                 writeGatewayConfig(port, provider, apiKey, model)
                 _progress.value = 0.8f
 
-                // Phase 3: Start gateway
+                // Phase 3: Start gateway + serve-ui in parallel
                 _state.value = GatewayState.Starting
                 GatewayService.updateStatus(context, "Starting gateway...")
                 log("Starting gateway...")
                 startGatewayProcess(port)
+                log("Starting Chat UI...")
+                startServeUiProcess()
                 _progress.value = 0.85f
 
                 // Phase 4: Wait for gateway to be listening
@@ -154,12 +156,8 @@ class GatewayManager(private val context: Context) {
                 waitForPort(port, timeoutMs = 60_000)
                 _progress.value = 0.9f
 
-                // Phase 5: Start serve-ui
+                // Phase 5: Poll serve-ui readiness
                 _state.value = GatewayState.WaitingForUi
-                log("Starting Chat UI...")
-                startServeUiProcess()
-
-                // Phase 6: Poll serve-ui readiness
                 log("Waiting for Chat UI...")
                 waitForPort(3001, timeoutMs = 30_000)
                 _progress.value = 1f
@@ -222,20 +220,21 @@ class GatewayManager(private val context: Context) {
                 }
 
                 _state.value = GatewayState.Starting
-                _progress.value = 0.5f
+                _progress.value = 0.3f
                 GatewayService.updateStatus(context, "Starting gateway...")
                 log("Starting gateway...")
-                setupLibDir()
-                makeRootfsExecutable()
+                ensureExecutable()
                 startGatewayProcess(port)
+
+                // Start serve-ui in parallel — don't wait for gateway first
+                log("Starting Chat UI...")
+                startServeUiProcess()
 
                 log("Waiting for gateway...")
                 waitForPort(port, timeoutMs = 60_000)
-                _progress.value = 0.8f
+                _progress.value = 0.7f
 
                 _state.value = GatewayState.WaitingForUi
-                log("Starting Chat UI...")
-                startServeUiProcess()
                 log("Waiting for Chat UI...")
                 waitForPort(3001, timeoutMs = 30_000)
 
@@ -293,8 +292,7 @@ class GatewayManager(private val context: Context) {
         log("Configuring environment...")
         _progress.value = 0.75f
         writeAndroidCompat()
-        setupLibDir()
-        makeRootfsExecutable()
+        ensureExecutable()
         writeLayersJson()
 
         if (!isRootfsReady) {
@@ -323,8 +321,7 @@ class GatewayManager(private val context: Context) {
     // ── Gateway process management ────────────────────────
 
     private suspend fun startGatewayProcess(port: Int) = withContext(Dispatchers.IO) {
-        setupLibDir()
-        makeRootfsExecutable()
+        ensureExecutable()
         prootBin.setExecutable(true)
 
         val gwCmd = buildProotCommand(
@@ -440,6 +437,15 @@ class GatewayManager(private val context: Context) {
     }
 
     // ── Helpers ────────────────────────────────────────────
+
+    /** Ensure libs + rootfs binaries are executable. Skips if already done this session. */
+    private var executableReady = false
+    private fun ensureExecutable() {
+        if (executableReady) return
+        setupLibDir()
+        makeRootfsExecutable()
+        executableReady = true
+    }
 
     private fun buildProotCommand(cmd: String): List<String> {
         return listOf(

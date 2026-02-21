@@ -13,6 +13,7 @@ import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,7 +34,10 @@ fun WebViewScreen(
     }
 
     AndroidView(
-        modifier = Modifier.fillMaxSize().imePadding(),
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding()
+            .imePadding(),
         factory = { context ->
             WebView(context).apply {
                 WebView.setWebContentsDebuggingEnabled(true)
@@ -67,7 +71,7 @@ fun WebViewScreen(
                     ) {
                         if (request?.isForMainFrame == true) {
                             view?.postDelayed({
-                                view.loadUrl("http://127.0.0.1:3001")
+                                view.loadUrl(buildUrl())
                             }, 2000)
                         }
                     }
@@ -80,10 +84,16 @@ fun WebViewScreen(
                     }
                 }
 
-                loadUrl("http://127.0.0.1:3001")
+                // Clear cache to pick up hot-updated SPA files
+                clearCache(true)
+                loadUrl(buildUrl())
                 webView = this
             }
         },
         update = { /* WebView persists across recompositions */ },
     )
 }
+
+/** Append a cache-busting query string so WebView never serves stale JS/CSS. */
+private fun buildUrl(): String =
+    "http://127.0.0.1:3001/?_t=${System.currentTimeMillis()}"

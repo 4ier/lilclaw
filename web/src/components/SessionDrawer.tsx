@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 
 export default function SessionDrawer() {
@@ -12,12 +12,27 @@ export default function SessionDrawer() {
   } = useStore()
 
   const drawerRef = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+
+  // Trigger enter animation on mount (GPU-accelerated translateX)
+  useEffect(() => {
+    // Force a layout read then set visible for the transition
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setVisible(true))
+    })
+  }, [])
+
+  const close = () => {
+    setVisible(false)
+    // Wait for exit animation to finish
+    setTimeout(() => setShowDrawer(false), 200)
+  }
 
   // Close on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
-        setShowDrawer(false)
+        close()
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -27,27 +42,38 @@ export default function SessionDrawer() {
   // Close on escape
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShowDrawer(false)
+      if (e.key === 'Escape') close()
     }
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
   }, [setShowDrawer])
 
-  // If sessions list is empty (e.g. not connected), show at least current
+  // If sessions list is empty, show at least current
   const displaySessions = sessions.length > 0
     ? sessions
     : [{ key: currentSessionKey }]
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      {/* Backdrop — GPU composited opacity transition */}
+      <div
+        className="absolute inset-0 bg-black/40"
+        style={{
+          opacity: visible ? 1 : 0,
+          transition: 'opacity 200ms ease-out',
+          willChange: 'opacity',
+        }}
+      />
 
-      {/* Drawer */}
+      {/* Drawer — GPU composited translateX transition */}
       <div
         ref={drawerRef}
-        className="relative w-72 max-w-[85vw] h-full bg-white dark:bg-[#141414] shadow-2xl flex flex-col animate-slide-in"
-        style={{ animation: 'slide-in 0.2s ease-out' }}
+        className="relative w-72 max-w-[85vw] h-full bg-white dark:bg-[#141414] shadow-2xl flex flex-col"
+        style={{
+          transform: visible ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 200ms ease-out',
+          willChange: 'transform',
+        }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 safe-top">
@@ -55,8 +81,8 @@ export default function SessionDrawer() {
             Sessions
           </h2>
           <button
-            onClick={() => setShowDrawer(false)}
-            className="touch-target flex items-center justify-center p-2 -mr-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors active:scale-95"
+            onClick={close}
+            className="flex items-center justify-center p-2 -mr-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-95"
             aria-label="Close"
           >
             <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -74,8 +100,8 @@ export default function SessionDrawer() {
             return (
               <button
                 key={session.key}
-                onClick={() => switchSession(session.key)}
-                className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-all touch-target ${
+                onClick={() => { switchSession(session.key); close() }}
+                className={`w-full px-4 py-3 text-left flex items-center gap-3 ${
                   isActive
                     ? 'bg-amber-50 dark:bg-amber-500/10'
                     : 'hover:bg-gray-50 dark:hover:bg-white/[0.04] active:bg-gray-100 dark:active:bg-white/[0.08]'
@@ -116,9 +142,9 @@ export default function SessionDrawer() {
             onClick={() => {
               const key = `chat-${Date.now()}`
               createSession(key)
-              setShowDrawer(false)
+              close()
             }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-sm hover:border-amber-500 hover:text-amber-700 dark:hover:border-amber-600 dark:hover:text-amber-500 transition-all active:scale-[0.98] touch-target"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-sm hover:border-amber-500 hover:text-amber-700 dark:hover:border-amber-600 dark:hover:text-amber-500 active:scale-[0.98]"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -127,13 +153,6 @@ export default function SessionDrawer() {
           </button>
         </div>
       </div>
-
-      <style>{`
-        @keyframes slide-in {
-          from { transform: translateX(-100%); }
-          to { transform: translateX(0); }
-        }
-      `}</style>
     </div>
   )
 }
