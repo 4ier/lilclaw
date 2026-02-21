@@ -147,8 +147,8 @@ export default function SessionDrawer() {
                 value={newSessionName}
                 onChange={(e) => setNewSessionName(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Session key"
-                className="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-700/40"
+                placeholder="Name your chat"
+                className="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#231c14] text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-700/40"
               />
               <button
                 onClick={handleCreateSession}
