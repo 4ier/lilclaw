@@ -220,7 +220,7 @@ export default function ChatScreen() {
           onKeyDown={handleKeyDown}
           placeholder="Message..."
           rows={1}
-          className="flex-1 resize-none px-3.5 py-2.5 rounded-[20px] border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:focus:ring-indigo-400/40 focus:border-indigo-300 dark:focus:border-indigo-600 transition-all text-[15px]"
+          className="flex-1 resize-none px-3.5 py-2.5 rounded-[20px] border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-700/40 dark:focus:ring-amber-600/40 focus:border-amber-400 dark:focus:border-amber-700 transition-all text-[15px]"
           style={{ maxHeight: '120px' }}
           disabled={connectionState !== 'connected'}
         />
@@ -228,7 +228,7 @@ export default function ChatScreen() {
         <button
           type="submit"
           disabled={!input.trim() || isSending || connectionState !== 'connected'}
-          className="touch-target flex items-center justify-center p-2.5 rounded-full bg-indigo-600 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-700 active:bg-indigo-800 active:scale-95 transition-all"
+          className="touch-target flex items-center justify-center p-2.5 rounded-full bg-amber-800 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-amber-900 active:bg-amber-950 active:scale-95 transition-all"
           aria-label="Send message"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>

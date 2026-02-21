@@ -1,11 +1,15 @@
 @import "tailwindcss";
 @import "highlight.js/styles/github-dark.css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --color-user-bubble: #4f46e5;
-  --color-user-bubble-dark: #6366f1;
-  --color-assistant-bubble: #f3f4f6;
-  --color-assistant-bubble-dark: #374151;
+  --color-user-bubble: #92400e;
+  --color-user-bubble-dark: #b45309;
+  --color-assistant-bubble: #f5f0eb;
+  --color-assistant-bubble-dark: #2a2017;
+  --color-accent: #92400e;
+  --color-accent-light: #f59e0b;
 }
 
 @layer base {
@@ -38,7 +42,7 @@
   }
 
   .message-bubble-user {
-    @apply bg-indigo-600 text-white;
+    @apply bg-amber-800 text-white;
     border-bottom-right-radius: 6px;
   }
 
@@ -174,7 +178,7 @@
 
 /* Blockquote */
 .prose-chat blockquote {
-  @apply border-l-[3px] border-indigo-400 dark:border-indigo-500;
+  @apply border-l-[3px] border-amber-500 dark:border-amber-600;
   padding-left: 0.75rem;
   margin: 0.5rem 0;
   font-style: italic;
@@ -212,7 +216,7 @@
 }
 
 .prose-chat input[type="checkbox"] {
-  @apply accent-indigo-500;
+  @apply accent-amber-700;
   margin: 0;
   transform: scale(1.1);
 }
@@ -321,7 +325,7 @@
 .cursor-blink::after {
   content: "▋";
   animation: blink 1s step-end infinite;
-  @apply ml-0.5 text-indigo-500 dark:text-indigo-400;
+  @apply ml-0.5 text-amber-700 dark:text-amber-500;
   font-size: 0.9em;
 }
 

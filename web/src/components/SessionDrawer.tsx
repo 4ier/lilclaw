@@ -104,13 +104,13 @@ export default function SessionDrawer() {
                 onClick={() => switchSession(session.key)}
                 className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-all touch-target ${
                   isActive
-                    ? 'bg-indigo-50 dark:bg-indigo-500/10'
+                    ? 'bg-amber-50 dark:bg-amber-500/10'
                     : 'hover:bg-gray-50 dark:hover:bg-white/[0.04] active:bg-gray-100 dark:active:bg-white/[0.08]'
                 }`}
               >
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-semibold ${
                   isActive
-                    ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400'
+                    ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-500'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
                 }`}>
                   {displayName.charAt(0).toUpperCase()}
@@ -118,19 +118,19 @@ export default function SessionDrawer() {
                 <div className="flex-1 min-w-0">
                   <div className={`text-[14px] truncate ${
                     isActive
-                      ? 'text-indigo-600 dark:text-indigo-400 font-medium'
+                      ? 'text-amber-800 dark:text-amber-500 font-medium'
                       : 'text-gray-900 dark:text-gray-100'
                   }`}>
                     {displayName}
                   </div>
-                  {session.label && (
+                  {session.label && session.key !== (session.label || session.key) && (
                     <div className="text-[11px] text-gray-400 dark:text-gray-500 truncate">
-                      {session.key}
+                      {session.key.replace(/^agent:[^:]+:/, '')}
                     </div>
                   )}
                 </div>
                 {isActive && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
                 )}
               </button>
             )
@@ -148,12 +148,12 @@ export default function SessionDrawer() {
                 onChange={(e) => setNewSessionName(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Session key"
-                className="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-700/40"
               />
               <button
                 onClick={handleCreateSession}
                 disabled={!newSessionName.trim()}
-                className="px-3.5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium disabled:opacity-30 hover:bg-indigo-700 active:scale-95 transition-all"
+                className="px-3.5 py-2 rounded-xl bg-amber-800 text-white text-sm font-medium disabled:opacity-30 hover:bg-amber-900 active:scale-95 transition-all"
               >
                 Add
               </button>
@@ -161,7 +161,7 @@ export default function SessionDrawer() {
           ) : (
             <button
               onClick={() => setShowNewInput(true)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-sm hover:border-indigo-400 hover:text-indigo-500 dark:hover:border-indigo-500 dark:hover:text-indigo-400 transition-all active:scale-[0.98] touch-target"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-sm hover:border-amber-500 hover:text-amber-700 dark:hover:border-amber-600 dark:hover:text-amber-500 transition-all active:scale-[0.98] touch-target"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />

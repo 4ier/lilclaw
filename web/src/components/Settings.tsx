@@ -1,51 +1,33 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useStore } from '../store'
 
-export default function Settings() {
-  const {
-    gatewayPort,
-    authToken,
-    theme,
-    setShowSettings,
-    setTheme,
-    updateSettings,
-  } = useStore()
+declare global {
+  interface Window {
+    LilClaw?: { openSettings: () => void }
+  }
+}
 
-  const [port, setPort] = useState(String(gatewayPort))
-  const [token, setToken] = useState(authToken)
+export default function Settings() {
+  const { theme, setShowSettings, setTheme } = useStore()
   const modalRef = useRef<HTMLDivElement>(null)
 
-  // Close on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
         setShowSettings(false)
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [setShowSettings])
 
-  // Close on escape
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowSettings(false)
-      }
+      if (e.key === 'Escape') setShowSettings(false)
     }
-
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
   }, [setShowSettings])
-
-  const handleSave = () => {
-    const portNum = parseInt(port, 10)
-    if (portNum > 0 && portNum < 65536) {
-      updateSettings(portNum, token)
-      setShowSettings(false)
-    }
-  }
 
   const themeOptions = [
     { value: 'system', label: 'System' },
@@ -55,16 +37,14 @@ export default function Settings() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" />
+      <div className="absolute inset-0 bg-black/40" />
 
-      {/* Modal */}
       <div
         ref={modalRef}
-        className="relative w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden animate-fade-in"
+        className="relative w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden animate-fade-in"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 dark:border-gray-700">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Settings
           </h2>
@@ -73,7 +53,7 @@ export default function Settings() {
             className="touch-target flex items-center justify-center p-2 -mr-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             aria-label="Close"
           >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -81,48 +61,20 @@ export default function Settings() {
 
         {/* Content */}
         <div className="p-4 space-y-4">
-          {/* Gateway Port */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Gateway Port
-            </label>
-            <input
-              type="number"
-              value={port}
-              onChange={(e) => setPort(e.target.value)}
-              min="1"
-              max="65535"
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          {/* Auth Token */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Auth Token
-            </label>
-            <input
-              type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
           {/* Theme */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Theme
+            <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+              Appearance
             </label>
             <div className="flex gap-2">
               {themeOptions.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setTheme(opt.value)}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors touch-target ${
+                  className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium transition-all touch-target ${
                     theme === opt.value
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-lg'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
                   {opt.label}
@@ -130,21 +82,36 @@ export default function Settings() {
               ))}
             </div>
           </div>
+
+          {/* AI Provider Settings — native bridge */}
+          {window.LilClaw && (
+            <button
+              onClick={() => {
+                setShowSettings(false)
+                window.LilClaw?.openSettings()
+              }}
+              className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-target"
+            >
+              <div className="flex items-center gap-3">
+                <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+                </svg>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Provider</span>
+              </div>
+              <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="flex gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700">
           <button
             onClick={() => setShowSettings(false)}
-            className="flex-1 py-2.5 px-4 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-target"
+            className="w-full py-2.5 rounded-xl text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors touch-target"
           >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="flex-1 py-2.5 px-4 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors touch-target"
-          >
-            Save
+            Done
           </button>
         </div>
       </div>
