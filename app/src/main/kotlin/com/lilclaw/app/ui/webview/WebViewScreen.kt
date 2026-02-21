@@ -18,13 +18,13 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -38,25 +38,39 @@ fun WebViewScreen(
         webView?.goBack()
     }
 
-    // Read IME + system bar insets as raw dp values — NO animation.
-    // imePadding() animates padding over ~300ms which causes
-    // continuous WebView resize → HTML relayout every frame = jank.
-    // Reading WindowInsets directly snaps to the final value instantly.
     val density = LocalDensity.current
     val imeInsets = WindowInsets.ime
     val systemBarsInsets = WindowInsets.systemBars
 
-    val imeBottom = with(density) { imeInsets.getBottom(density).toDp() }
-    val systemTop = with(density) { systemBarsInsets.getTop(density).toDp() }
-    val systemBottom = with(density) { systemBarsInsets.getBottom(density).toDp() }
+    val imeBottomPx = imeInsets.getBottom(density)
+    val systemTopDp = with(density) { systemBarsInsets.getTop(density).toDp() }
+    val systemBottomPx = systemBarsInsets.getBottom(density)
 
-    // When keyboard is open, use IME bottom; otherwise use system nav bar bottom
-    val bottomPadding = if (imeBottom > systemBottom) imeBottom else systemBottom
+    // Keyboard height in CSS px (device px / density).
+    // When keyboard is closed, imeBottomPx == 0 or <= systemBottomPx.
+    val kbHeightCssPx = with(density) {
+        val extra = (imeBottomPx - systemBottomPx).coerceAtLeast(0)
+        (extra / density.density).toInt()
+    }
+
+    // Inject keyboard height into WebView as a CSS custom property.
+    // This avoids resizing the WebView container (which triggers expensive HTML relayout).
+    // The SPA uses `var(--kb-height)` to add bottom padding to the input bar.
+    LaunchedEffect(kbHeightCssPx) {
+        webView?.evaluateJavascript(
+            "document.documentElement.style.setProperty('--kb-height','${kbHeightCssPx}px')",
+            null
+        )
+    }
+
+    // WebView takes full screen minus system bars (status bar + nav bar).
+    // Keyboard space is NOT subtracted — the CSS variable handles it internally.
+    val systemBottomDp = with(density) { systemBottomPx.toDp() }
 
     AndroidView(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = systemTop, bottom = bottomPadding)
+            .padding(top = systemTopDp, bottom = systemBottomDp)
             .consumeWindowInsets(WindowInsets.systemBars)
             .consumeWindowInsets(WindowInsets.ime),
         factory = { context ->
@@ -66,6 +80,12 @@ fun WebViewScreen(
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
                 overScrollMode = WebView.OVER_SCROLL_NEVER
+
+                // Match dark/light background to avoid white flash before SPA loads
+                val isDark = (context.resources.configuration.uiMode
+                    and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                    android.content.res.Configuration.UI_MODE_NIGHT_YES
+                setBackgroundColor(if (isDark) android.graphics.Color.parseColor("#1a1410") else android.graphics.Color.WHITE)
 
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
@@ -103,6 +123,7 @@ fun WebViewScreen(
                     }
                 }
 
+                // Set initial --kb-height before page loads
                 clearCache(true)
                 loadUrl(buildUrl())
                 webView = this

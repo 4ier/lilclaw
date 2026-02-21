@@ -74,12 +74,44 @@ export default function ChatScreen() {
   const currentStreaming = streaming[currentSessionKey]
   const isTyping = typing[currentSessionKey] || false
   const rawDisplayName = getSessionDisplayName(currentSessionKey)
-  const displayName = rawDisplayName === 'main' ? 'LilClaw' : rawDisplayName
+  // Clean up display: "main" → "LilClaw", "chat-NNNNN" → "New Chat"
+  const displayName = rawDisplayName === 'main'
+    ? 'LilClaw'
+    : /^chat-\d+$/.test(rawDisplayName)
+      ? 'New Chat'
+      : rawDisplayName
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [currentMessages, currentStreaming, isTyping])
+
+  // Scroll to bottom when container resizes (e.g. keyboard open/close).
+  // Uses ResizeObserver on the messages container — works regardless of
+  // whether the resize comes from Kotlin insets or CSS changes.
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const wasAtBottomRef = useRef(true)
+
+  // Track whether user is scrolled to bottom
+  const handleScroll = useCallback(() => {
+    const el = messagesContainerRef.current
+    if (!el) return
+    const threshold = 60 // px from bottom to consider "at bottom"
+    wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
+  }, [])
+
+  useEffect(() => {
+    const container = messagesContainerRef.current
+    if (!container) return
+    const ro = new ResizeObserver(() => {
+      // Only auto-scroll if user was at the bottom before resize
+      if (wasAtBottomRef.current) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }
+    })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [])
 
   // Focus input on mount
   useEffect(() => {
@@ -135,7 +167,11 @@ export default function ChatScreen() {
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+      <div
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0"
+      >
         {currentMessages.length === 0 && !currentStreaming?.isStreaming && (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
             <svg className="w-14 h-14 mb-3 opacity-40" viewBox="0 0 100 100" fill="currentColor">
@@ -178,6 +214,7 @@ export default function ChatScreen() {
       <form
         onSubmit={handleSubmit}
         className="flex items-end gap-2 px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1a1410] flex-shrink-0"
+        style={{ paddingBottom: 'calc(var(--kb-height, 0px) + 10px)' }}
       >
         <textarea
           ref={inputRef}

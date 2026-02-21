@@ -95,7 +95,12 @@ export default function SessionDrawer() {
         <div className="flex-1 overflow-y-auto py-1">
           {displaySessions.map((session) => {
             const isActive = session.key === currentSessionKey
-            const displayName = getSessionDisplayName(session.key)
+            const rawName = getSessionDisplayName(session.key)
+            const displayName = rawName === 'main'
+              ? 'LilClaw'
+              : /^chat-\d+$/.test(rawName)
+                ? 'New Chat'
+                : rawName
 
             return (
               <button

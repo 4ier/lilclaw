@@ -4,9 +4,31 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#1e1b4b" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#1a1410" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <title>LilClaw Chat</title>
+    <script>
+      // Synchronous dark mode — must run before first paint to avoid white flash.
+      // Mirrors the logic in store/index.ts but executes inline (blocking).
+      (function() {
+        try {
+          var stored = localStorage.getItem('lilclaw-chat-storage');
+          if (stored) {
+            var theme = JSON.parse(stored).state?.theme;
+            if (theme === 'dark' || (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)) {
+              document.documentElement.classList.add('dark');
+            }
+          } else if (matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+          }
+        } catch(e) {}
+      })();
+    </script>
+    <style>
+      /* Pre-paint background — matches the app's dark/light bg so no flash */
+      body { background: #ffffff; }
+      .dark body, :root.dark body { background: #1a1410; }
+    </style>
   </head>
   <body style="height:100%;overflow:hidden;margin:0">
     <div id="root" style="height:100%"></div>
