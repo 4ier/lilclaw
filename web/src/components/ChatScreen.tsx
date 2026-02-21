@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type FormEvent } from 'react'
+import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react'
 import { useStore } from '../store'
 import MessageBubble from './MessageBubble'
 
@@ -35,7 +35,7 @@ function AgentStatus() {
 
   if (!state) return null
 
-  const labels = {
+  const labels: Record<string, string> = {
     thinking: 'Thinking...',
     tool_use: 'Using tools...',
     done: '',
@@ -80,7 +80,6 @@ export default function ChatScreen() {
   } = useStore()
 
   const [input, setInput] = useState('')
-  const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -100,7 +99,6 @@ export default function ChatScreen() {
     const vv = window.visualViewport
     if (!vv) return
     const handleResize = () => {
-      // Small delay to let layout settle after keyboard animation
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
       }, 100)
@@ -114,36 +112,33 @@ export default function ChatScreen() {
     inputRef.current?.focus()
   }, [])
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = useCallback((e: FormEvent) => {
     e.preventDefault()
     const trimmed = input.trim()
-    if (!trimmed || isSending || connectionState !== 'connected') return
+    if (!trimmed || connectionState !== 'connected') return
 
-    setIsSending(true)
+    // Clear input synchronously — do NOT await sendMessage
+    // This keeps focus on the textarea and prevents keyboard dismiss
     setInput('')
+    sendMessage(trimmed)
 
-    try {
-      await sendMessage(trimmed)
-    } finally {
-      setIsSending(false)
-      inputRef.current?.focus()
-    }
-  }
+    // No focus() call needed — textarea never lost focus
+  }, [input, connectionState, sendMessage])
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e)
     }
-  }
+  }, [handleSubmit])
 
   return (
     <div className="flex flex-col h-full">
-      {/* Top bar */}
-      <header className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 safe-top bg-white/80 dark:bg-[#1a1410]/80 backdrop-blur-lg">
+      {/* Top bar — no backdrop-blur for GPU perf on Android */}
+      <header className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 safe-top bg-white dark:bg-[#1a1410]">
         <button
           onClick={() => setShowDrawer(true)}
-          className="touch-target flex items-center justify-center -ml-2 p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors active:scale-95"
+          className="flex items-center justify-center -ml-2 p-2 rounded-xl active:bg-gray-100 dark:active:bg-gray-800"
           aria-label="Open sessions"
         >
           <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -160,7 +155,7 @@ export default function ChatScreen() {
 
         <button
           onClick={() => setShowSettings(true)}
-          className="touch-target flex items-center justify-center -mr-2 p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors active:scale-95"
+          className="flex items-center justify-center -mr-2 p-2 rounded-xl active:bg-gray-100 dark:active:bg-gray-800"
           aria-label="Settings"
         >
           <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -201,7 +196,7 @@ export default function ChatScreen() {
         )}
 
         {isTyping && !currentStreaming?.isStreaming && (
-          <div className="flex justify-start animate-fade-in">
+          <div className="flex justify-start">
             <div className="message-bubble message-bubble-assistant">
               <div className="flex items-center gap-1 py-1 px-0.5">
                 <span className="w-2 h-2 rounded-full bg-amber-600/60 dark:bg-amber-500/60 animate-bounce [animation-delay:0ms]" />
@@ -218,10 +213,10 @@ export default function ChatScreen() {
       {/* Agent status */}
       <AgentStatus />
 
-      {/* Input bar */}
+      {/* Input bar — no backdrop-blur for GPU perf on Android */}
       <form
         onSubmit={handleSubmit}
-        className="flex items-end gap-2 px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 safe-bottom bg-white/80 dark:bg-[#1a1410]/80 backdrop-blur-lg"
+        className="flex items-end gap-2 px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 safe-bottom bg-white dark:bg-[#1a1410]"
       >
         <textarea
           ref={inputRef}
@@ -229,20 +224,19 @@ export default function ChatScreen() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            // Scroll messages to bottom when keyboard opens
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 300)
           }}
           placeholder="Message..."
           rows={1}
-          className="flex-1 resize-none px-3.5 py-2.5 rounded-[20px] border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#231c14] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-700/40 dark:focus:ring-amber-600/40 focus:border-amber-400 dark:focus:border-amber-700 transition-all text-[15px]"
+          className="flex-1 resize-none px-3.5 py-2.5 rounded-[20px] border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#231c14] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-700/40 dark:focus:ring-amber-600/40 focus:border-amber-400 dark:focus:border-amber-700 text-[15px]"
           style={{ maxHeight: '120px' }}
           disabled={connectionState !== 'connected'}
         />
 
         <button
           type="submit"
-          disabled={!input.trim() || isSending || connectionState !== 'connected'}
-          className="touch-target flex items-center justify-center p-2.5 rounded-full bg-amber-800 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-amber-900 active:bg-amber-950 active:scale-95 transition-all"
+          disabled={!input.trim() || connectionState !== 'connected'}
+          className="flex items-center justify-center p-2.5 rounded-full bg-amber-800 text-white disabled:opacity-30 hover:bg-amber-900 active:bg-amber-950 active:scale-95"
           aria-label="Send message"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
