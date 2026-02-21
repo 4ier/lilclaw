@@ -1,0 +1,22 @@
+{
+  "layers": [
+    {
+      "name": "base",
+      "file": "base-arm64-2.0.0.tar.gz",
+      "version": "2.0.0",
+      "size": 33380716
+    },
+    {
+      "name": "openclaw",
+      "file": "openclaw-2026.2.17.tar.gz",
+      "version": "2026.2.17",
+      "size": 32088977
+    },
+    {
+      "name": "chatspa",
+      "file": "chatspa-0.3.7.tar.gz",
+      "version": "0.3.7",
+      "size": 237044
+    }
+  ]
+}

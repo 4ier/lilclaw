@@ -45,8 +45,13 @@ class GatewayManager(private val context: Context) {
         private const val TAG = "GatewayManager"
         private const val RELEASES_BASE =
             "https://github.com/4ier/lilclaw/releases/download/layers-v2"
+        private const val MANIFEST_URL = "$RELEASES_BASE/manifest.json"
 
-        val LAYERS = listOf(
+        /** Fallback layer definitions used only for first-time bootstrap when
+         *  the manifest can't be fetched. On subsequent starts, manifest.json
+         *  from GitHub is the source of truth — APK never needs updating for
+         *  layer version bumps. */
+        val FALLBACK_LAYERS = listOf(
             LayerInfo(
                 "base", "base-arm64-2.0.0.tar.gz",
                 "$RELEASES_BASE/base-arm64-2.0.0.tar.gz",
@@ -93,18 +98,68 @@ class GatewayManager(private val context: Context) {
                 && File(rootfsDir, "usr/bin/node").exists()
                 && File(rootfsDir, "usr/local/bin/openclaw").exists()
 
-    /** Returns layers whose installed version doesn't match LAYERS definition. */
-    private fun getStaleLayers(): List<LayerInfo> {
-        if (!layersJson.exists()) return LAYERS
+    /** Returns layers whose installed version doesn't match the latest manifest. */
+    private suspend fun getStaleLayers(): List<LayerInfo> {
+        val latest = fetchManifestLayers() ?: FALLBACK_LAYERS
+        if (!layersJson.exists()) return latest
         return try {
             val installed = JSONObject(layersJson.readText())
-            LAYERS.filter { layer ->
+            latest.filter { layer ->
                 val obj = installed.optJSONObject(layer.name)
                 obj == null || obj.optString("version") != layer.version
             }
         } catch (e: Exception) {
-            LAYERS
+            latest
         }
+    }
+
+    /** Fetch manifest.json from GitHub to get latest layer versions.
+     *  Returns null on network error (caller falls back to FALLBACK_LAYERS). */
+    private suspend fun fetchManifestLayers(): List<LayerInfo>? = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(MANIFEST_URL)
+            val conn = url.openConnection() as HttpURLConnection
+            conn.connectTimeout = 10_000
+            conn.readTimeout = 10_000
+            conn.instanceFollowRedirects = true
+            try {
+                if (conn.responseCode != 200) return@withContext null
+                val text = conn.inputStream.bufferedReader().readText()
+                val json = JSONObject(text)
+                val arr = json.getJSONArray("layers")
+                val layers = mutableListOf<LayerInfo>()
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    val name = obj.getString("name")
+                    val file = obj.getString("file")
+                    val version = obj.getString("version")
+                    val size = obj.optLong("size", 0L)
+                    layers.add(
+                        LayerInfo(
+                            name = name,
+                            assetFile = file,
+                            fallbackUrl = "$RELEASES_BASE/$file",
+                            sizeBytes = size,
+                            displaySize = formatSize(size),
+                            version = version,
+                        )
+                    )
+                }
+                log("Manifest: ${layers.joinToString { "${it.name}@${it.version}" }}")
+                layers
+            } finally {
+                conn.disconnect()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to fetch manifest: ${e.message}")
+            null
+        }
+    }
+
+    private fun formatSize(bytes: Long): String = when {
+        bytes >= 1_048_576 -> "${bytes / 1_048_576} MB"
+        bytes >= 1024 -> "${bytes / 1024} KB"
+        else -> "$bytes B"
     }
 
     private fun log(msg: String) {
@@ -195,7 +250,7 @@ class GatewayManager(private val context: Context) {
                     return@launch
                 }
 
-                // Check for layer updates (e.g. chatspa version bump in new APK)
+                // Check for layer updates via remote manifest
                 val stale = getStaleLayers()
                 if (stale.isNotEmpty()) {
                     log("Updating ${stale.joinToString { it.name }}...")
@@ -212,7 +267,8 @@ class GatewayManager(private val context: Context) {
                         tarGzFile.delete()
                         log("${layer.name} updated ✓")
                     }
-                    writeLayersJson()
+                    // Merge updated layer versions into .layers.json
+                    mergeLayersJson(stale)
                 }
 
                 if (provider.isNotEmpty()) {
@@ -254,11 +310,13 @@ class GatewayManager(private val context: Context) {
     // ── Rootfs extraction ─────────────────────────────────
 
     private suspend fun extractRootfsInternal() {
-        val totalBytes = LAYERS.sumOf { it.sizeBytes }
+        val layers = fetchManifestLayers() ?: FALLBACK_LAYERS
+        lastInstalledLayers = layers
+        val totalBytes = layers.sumOf { it.sizeBytes }
         var completedBytes = 0L
         rootfsDir.mkdirs()
 
-        for ((idx, layer) in LAYERS.withIndex()) {
+        for ((idx, layer) in layers.withIndex()) {
             val tarGzFile = File(context.cacheDir, "${layer.name}.tar.gz")
 
             // Try bundled asset first, fall back to network
@@ -548,10 +606,30 @@ class GatewayManager(private val context: Context) {
         )
     }
 
+    /** Track which layers were actually installed so we can diff later. */
+    private var lastInstalledLayers: List<LayerInfo> = FALLBACK_LAYERS
+
     private fun writeLayersJson() {
         val now = java.time.Instant.now().toString()
         val json = JSONObject()
-        for (layer in LAYERS) {
+        for (layer in lastInstalledLayers) {
+            json.put(layer.name, JSONObject().apply {
+                put("version", layer.version)
+                put("installedAt", now)
+            })
+        }
+        layersJson.writeText(json.toString(2))
+    }
+
+    /** Merge newly updated layers into existing .layers.json (for quickStart partial updates). */
+    private fun mergeLayersJson(updatedLayers: List<LayerInfo>) {
+        val now = java.time.Instant.now().toString()
+        val json = if (layersJson.exists()) {
+            try { JSONObject(layersJson.readText()) } catch (e: Exception) { JSONObject() }
+        } else {
+            JSONObject()
+        }
+        for (layer in updatedLayers) {
             json.put(layer.name, JSONObject().apply {
                 put("version", layer.version)
                 put("installedAt", now)
