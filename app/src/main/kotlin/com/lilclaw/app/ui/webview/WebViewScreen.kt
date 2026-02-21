@@ -54,7 +54,7 @@ fun WebViewScreen(
                 addJavascriptInterface(object {
                     @JavascriptInterface
                     fun openSettings() {
-                        onSettingsClick()
+                        post { onSettingsClick() }
                     }
                 }, "LilClaw")
 
