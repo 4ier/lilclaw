@@ -46,11 +46,7 @@ function AgentStatus() {
 
   return (
     <div className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800">
-      <svg
-        className="w-4 h-4 animate-spin"
-        viewBox="0 0 24 24"
-        fill="none"
-      >
+      <svg className="w-4 h-4 animate-spin text-amber-700 dark:text-amber-500" viewBox="0 0 24 24" fill="none">
         <circle
           className="opacity-25"
           cx="12"
@@ -194,9 +190,9 @@ export default function ChatScreen() {
           <div className="flex justify-start animate-fade-in">
             <div className="message-bubble message-bubble-assistant">
               <div className="flex items-center gap-1 py-1 px-0.5">
-                <span className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce [animation-delay:0ms]" />
-                <span className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce [animation-delay:150ms]" />
-                <span className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce [animation-delay:300ms]" />
+                <span className="w-2 h-2 rounded-full bg-amber-600/60 dark:bg-amber-500/60 animate-bounce [animation-delay:0ms]" />
+                <span className="w-2 h-2 rounded-full bg-amber-600/60 dark:bg-amber-500/60 animate-bounce [animation-delay:150ms]" />
+                <span className="w-2 h-2 rounded-full bg-amber-600/60 dark:bg-amber-500/60 animate-bounce [animation-delay:300ms]" />
               </div>
             </div>
           </div>
