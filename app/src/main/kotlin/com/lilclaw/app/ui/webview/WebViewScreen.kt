@@ -11,15 +11,20 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -33,16 +38,31 @@ fun WebViewScreen(
         webView?.goBack()
     }
 
+    // Read IME + system bar insets as raw dp values — NO animation.
+    // imePadding() animates padding over ~300ms which causes
+    // continuous WebView resize → HTML relayout every frame = jank.
+    // Reading WindowInsets directly snaps to the final value instantly.
+    val density = LocalDensity.current
+    val imeInsets = WindowInsets.ime
+    val systemBarsInsets = WindowInsets.systemBars
+
+    val imeBottom = with(density) { imeInsets.getBottom(density).toDp() }
+    val systemTop = with(density) { systemBarsInsets.getTop(density).toDp() }
+    val systemBottom = with(density) { systemBarsInsets.getBottom(density).toDp() }
+
+    // When keyboard is open, use IME bottom; otherwise use system nav bar bottom
+    val bottomPadding = if (imeBottom > systemBottom) imeBottom else systemBottom
+
     AndroidView(
         modifier = Modifier
             .fillMaxSize()
-            .systemBarsPadding()
-            .imePadding(),
+            .padding(top = systemTop, bottom = bottomPadding)
+            .consumeWindowInsets(WindowInsets.systemBars)
+            .consumeWindowInsets(WindowInsets.ime),
         factory = { context ->
             WebView(context).apply {
                 WebView.setWebContentsDebuggingEnabled(true)
 
-                // Prevent WebView from scrolling — SPA handles its own scrolling
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
                 overScrollMode = WebView.OVER_SCROLL_NEVER
@@ -55,7 +75,6 @@ fun WebViewScreen(
                 settings.cacheMode = WebSettings.LOAD_NO_CACHE
                 settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
 
-                // Expose native navigation to the SPA
                 addJavascriptInterface(object {
                     @JavascriptInterface
                     fun openSettings() {
@@ -84,16 +103,14 @@ fun WebViewScreen(
                     }
                 }
 
-                // Clear cache to pick up hot-updated SPA files
                 clearCache(true)
                 loadUrl(buildUrl())
                 webView = this
             }
         },
-        update = { /* WebView persists across recompositions */ },
+        update = {},
     )
 }
 
-/** Append a cache-busting query string so WebView never serves stale JS/CSS. */
 private fun buildUrl(): String =
     "http://127.0.0.1:3001/?_t=${System.currentTimeMillis()}"
