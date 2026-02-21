@@ -8,7 +8,7 @@ import { mockConversation } from './lib/mockData'
 const USE_MOCK = new URLSearchParams(window.location.search).has('mock')
 
 export default function App() {
-  const { showSettings, showDrawer, connect } = useStore()
+  const { showSettings, connect } = useStore()
 
   useEffect(() => {
     if (USE_MOCK) {
@@ -32,7 +32,8 @@ export default function App() {
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden bg-white dark:bg-[#1a1410]">
       <ChatScreen />
-      {showDrawer && <SessionDrawer />}
+      {/* Drawer always mounted — pure CSS show/hide for 60fps animation */}
+      <SessionDrawer />
       {showSettings && <Settings />}
     </div>
   )

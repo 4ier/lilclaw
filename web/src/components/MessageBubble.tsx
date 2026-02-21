@@ -151,7 +151,7 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
 
   return (
     <div
-      className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}
+      className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
     >
       <div
         className={`message-bubble ${

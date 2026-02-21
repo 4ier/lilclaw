@@ -236,7 +236,10 @@ export default function ChatScreen() {
         <button
           type="submit"
           disabled={!input.trim() || connectionState !== 'connected'}
-          className="flex items-center justify-center p-2.5 rounded-full bg-amber-800 text-white disabled:opacity-30 hover:bg-amber-900 active:bg-amber-950 active:scale-95"
+          // Prevent button from stealing focus from textarea → keeps keyboard open
+          onTouchStart={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
+          className="flex items-center justify-center p-2.5 rounded-full bg-amber-800 text-white disabled:opacity-30 active:bg-amber-950 active:scale-95"
           aria-label="Send message"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>

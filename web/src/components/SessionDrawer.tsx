@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useStore } from '../store'
 
 export default function SessionDrawer() {
   const {
+    showDrawer,
     sessions,
     currentSessionKey,
     switchSession,
@@ -12,41 +13,35 @@ export default function SessionDrawer() {
   } = useStore()
 
   const drawerRef = useRef<HTMLDivElement>(null)
-  const [visible, setVisible] = useState(false)
 
-  // Trigger enter animation on mount (GPU-accelerated translateX)
+  const close = useCallback(() => setShowDrawer(false), [setShowDrawer])
+
+  // Close on click outside drawer panel
   useEffect(() => {
-    // Force a layout read then set visible for the transition
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => setVisible(true))
-    })
-  }, [])
-
-  const close = () => {
-    setVisible(false)
-    // Wait for exit animation to finish
-    setTimeout(() => setShowDrawer(false), 200)
-  }
-
-  // Close on click outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    if (!showDrawer) return
+    const handleClickOutside = (e: TouchEvent | MouseEvent) => {
       if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
         close()
       }
     }
+    // Use touchend to avoid ghost clicks on mobile
+    document.addEventListener('touchend', handleClickOutside, { passive: true })
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [setShowDrawer])
+    return () => {
+      document.removeEventListener('touchend', handleClickOutside)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showDrawer, close])
 
   // Close on escape
   useEffect(() => {
+    if (!showDrawer) return
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close()
     }
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
-  }, [setShowDrawer])
+  }, [showDrawer, close])
 
   // If sessions list is empty, show at least current
   const displaySessions = sessions.length > 0
@@ -54,25 +49,30 @@ export default function SessionDrawer() {
     : [{ key: currentSessionKey }]
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop — GPU composited opacity transition */}
+    <div
+      className="fixed inset-0 z-50 flex"
+      style={{
+        pointerEvents: showDrawer ? 'auto' : 'none',
+        visibility: showDrawer ? 'visible' : 'hidden',
+        // Keep in DOM but hidden — avoids mount/unmount cost
+      }}
+    >
+      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40"
         style={{
-          opacity: visible ? 1 : 0,
-          transition: 'opacity 200ms ease-out',
-          willChange: 'opacity',
+          opacity: showDrawer ? 1 : 0,
+          transition: 'opacity 180ms ease-out',
         }}
       />
 
-      {/* Drawer — GPU composited translateX transition */}
+      {/* Drawer panel */}
       <div
         ref={drawerRef}
         className="relative w-72 max-w-[85vw] h-full bg-white dark:bg-[#141414] shadow-2xl flex flex-col"
         style={{
-          transform: visible ? 'translateX(0)' : 'translateX(-100%)',
-          transition: 'transform 200ms ease-out',
-          willChange: 'transform',
+          transform: showDrawer ? 'translate3d(0,0,0)' : 'translate3d(-100%,0,0)',
+          transition: 'transform 180ms ease-out',
         }}
       >
         {/* Header */}
@@ -82,7 +82,7 @@ export default function SessionDrawer() {
           </h2>
           <button
             onClick={close}
-            className="flex items-center justify-center p-2 -mr-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-95"
+            className="flex items-center justify-center p-2 -mr-2 rounded-xl active:bg-gray-100 dark:active:bg-gray-800"
             aria-label="Close"
           >
             <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -104,7 +104,7 @@ export default function SessionDrawer() {
                 className={`w-full px-4 py-3 text-left flex items-center gap-3 ${
                   isActive
                     ? 'bg-amber-50 dark:bg-amber-500/10'
-                    : 'hover:bg-gray-50 dark:hover:bg-white/[0.04] active:bg-gray-100 dark:active:bg-white/[0.08]'
+                    : 'active:bg-gray-100 dark:active:bg-white/[0.08]'
                 }`}
               >
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-semibold ${
@@ -144,7 +144,7 @@ export default function SessionDrawer() {
               createSession(key)
               close()
             }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-sm hover:border-amber-500 hover:text-amber-700 dark:hover:border-amber-600 dark:hover:text-amber-500 active:scale-[0.98]"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-sm active:scale-[0.98]"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
