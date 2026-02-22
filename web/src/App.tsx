@@ -3,6 +3,7 @@ import { useStore } from './store'
 import ChatScreen from './components/ChatScreen'
 import SessionDrawer from './components/SessionDrawer'
 import Settings from './components/Settings'
+import Welcome from './components/Welcome'
 import { mockConversation } from './lib/mockData'
 
 const USE_MOCK = new URLSearchParams(window.location.search).has('mock')
@@ -41,6 +42,7 @@ export default function App() {
       <ChatScreen />
       <SessionDrawer />
       {showSettings && <Settings />}
+      <Welcome />
     </div>
   )
 }
