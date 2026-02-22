@@ -23,7 +23,8 @@ interface MessageBubbleProps {
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
 
-  const handleCopy = async () => {
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation()
     await navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -32,9 +33,9 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="absolute top-2 right-2 px-2 py-1 text-[11px] rounded-md bg-white/10 hover:bg-white/20 text-gray-300 opacity-0 group-hover:opacity-100 touch-target"
+      className="absolute top-1.5 right-2 px-2 py-1 text-[10px] rounded-md bg-white/10 hover:bg-white/20 active:bg-white/30 text-gray-400 transition-opacity touch-target"
     >
-      {copied ? '✓ Copied' : 'Copy'}
+      {copied ? '✓' : 'Copy'}
     </button>
   )
 }

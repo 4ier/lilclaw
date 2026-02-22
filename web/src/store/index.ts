@@ -220,6 +220,9 @@ export const useStore = create<AppState>()(
             return {
               messages: { ...state.messages, [currentSessionKey]: newMessages },
               typing: { ...state.typing, [currentSessionKey]: true },
+              sessions: state.sessions.map((s) =>
+                s.key === currentSessionKey ? { ...s, lastActivity: Date.now() } : s
+              ),
             }
           })
 
@@ -263,7 +266,7 @@ export const useStore = create<AppState>()(
 
         createSession: (sessionKey: string) => {
           set((state) => ({
-            sessions: [...state.sessions.filter((s) => s.key !== sessionKey), { key: sessionKey }],
+            sessions: [...state.sessions.filter((s) => s.key !== sessionKey), { key: sessionKey, lastActivity: Date.now() }],
             currentSessionKey: sessionKey,
             showDrawer: false,
           }))
