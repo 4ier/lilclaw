@@ -347,7 +347,6 @@ export default function ChatScreen() {
           <button
             type="submit"
             disabled={!input.trim() || connectionState !== 'connected'}
-            onTouchStart={(e) => e.preventDefault()}
             onMouseDown={(e) => e.preventDefault()}
             className="flex items-center justify-center p-2.5 rounded-full bg-amber-800 text-white disabled:opacity-30 active:bg-amber-950 active:scale-95 transition-all"
             aria-label="Send message"
