@@ -20,13 +20,14 @@ WebView → http://127.0.0.1:3001 (Chat SPA)
 
 ## Layered Rootfs
 
-APK 内置 3 层 rootfs（首次启动从 assets 解压，零网络下载）：
+APK 内置 4 层 rootfs（首次启动从 assets 解压，零网络下载）：
 
 | Layer | File | Size | Content |
 |-------|------|------|---------|
 | base | `base-arm64-2.0.0.tar.gz` | 41MB | Alpine Linux + Node.js |
 | openclaw | `openclaw-2026.2.17-bundled.tar.gz` | 42MB | OpenClaw gateway (esbuild bundled) |
 | chatspa | `chatspa-0.6.0.tar.gz` | 242KB | Chat SPA (React + Tailwind) |
+| config | `config-0.1.0.tar.gz` | 2KB | SOUL.md + TOOLS.md + skills |
 
 ### Layer 更新流程
 
