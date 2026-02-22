@@ -9,6 +9,7 @@ import { useStore } from '../store'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 import ImageLightbox from './ImageLightbox'
 import { showToast } from './Toast'
+import { haptic } from '../lib/haptic'
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant'
@@ -318,6 +319,7 @@ export default function MessageBubble({
                   e.stopPropagation()
                   navigator.clipboard.writeText(textContent).then(() => {
                     setCopied(true)
+                    haptic('selection')
                     showToast('已复制到剪贴板', 'success')
                     setTimeout(() => setCopied(false), 1500)
                   })
