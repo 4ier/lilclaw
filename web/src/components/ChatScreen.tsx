@@ -125,6 +125,7 @@ export default function ChatScreen() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const wasAtBottomRef = useRef(true)
+  const [showScrollBtn, setShowScrollBtn] = useState(false)
   const prevMessageCountRef = useRef(0)
 
   const currentMessages = messages[currentSessionKey] || []
@@ -161,7 +162,13 @@ export default function ChatScreen() {
   const handleScroll = useCallback(() => {
     const el = messagesContainerRef.current
     if (!el) return
-    wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+    wasAtBottomRef.current = atBottom
+    setShowScrollBtn(!atBottom)
+  }, [])
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
   // Focus input on mount
@@ -211,7 +218,7 @@ export default function ChatScreen() {
   })()
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       {/* Top bar */}
       <header className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1a1410] flex-shrink-0">
         <button
@@ -255,14 +262,32 @@ export default function ChatScreen() {
         className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-0"
       >
         {currentMessages.length === 0 && !currentStreaming?.isStreaming && (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
+          <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 px-6">
             <svg className="w-14 h-14 mb-3 opacity-40" viewBox="0 0 100 100" fill="currentColor">
               <ellipse cx="30" cy="28" rx="10" ry="12" />
               <ellipse cx="50" cy="22" rx="10" ry="12" />
               <ellipse cx="70" cy="28" rx="10" ry="12" />
               <ellipse cx="50" cy="55" rx="18" ry="20" />
             </svg>
-            <p className="text-base font-medium text-gray-500 dark:text-gray-400">What's on your mind?</p>
+            <p className="text-base font-medium text-gray-500 dark:text-gray-400 mb-6">What's on your mind?</p>
+            {connectionState === 'connected' && (
+              <div className="flex flex-wrap justify-center gap-2 max-w-[320px]">
+                {[
+                  'Summarize a webpage',
+                  'Write a script',
+                  'Explain a concept',
+                  'Help me debug',
+                ].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => sendMessage(suggestion)}
+                    className="px-3 py-1.5 text-[13px] rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 transition-all"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -308,6 +333,19 @@ export default function ChatScreen() {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Scroll to bottom FAB */}
+      {showScrollBtn && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-24 right-4 z-10 w-9 h-9 rounded-full bg-white dark:bg-[#2a2218] border border-gray-200 dark:border-gray-700 shadow-lg flex items-center justify-center active:scale-90 transition-all animate-fade-in"
+          aria-label="Scroll to bottom"
+        >
+          <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+        </button>
+      )}
 
       {/* Agent status */}
       <AgentStatus />
