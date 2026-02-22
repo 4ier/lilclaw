@@ -13,8 +13,8 @@ android {
         minSdk = 26
         //noinspection OldTargetApi — targetSdk 28 required for proot execve (W^X exemption)
         targetSdk = 28
-        versionCode = 6
-        versionName = "0.4.0"
+        versionCode = 11
+        versionName = "0.5.5"
 
         ndk {
             abiFilters += listOf("arm64-v8a")
@@ -51,9 +51,17 @@ android {
         buildConfig = true
     }
 
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "lilclaw-v${variant.versionName}.apk"
+        }
+    }
+
     // Don't compress rootfs tarballs in assets (we extract them ourselves)
     androidResources {
-        noCompress += listOf("tar.gz")
+        noCompress += listOf("tar.gz", "bin")
     }
 }
 

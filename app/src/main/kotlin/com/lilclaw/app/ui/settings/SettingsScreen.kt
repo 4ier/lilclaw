@@ -47,10 +47,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text("设置") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                     }
                 },
             )
@@ -69,14 +69,14 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val (statusColor, statusText) = when (state.gatewayState) {
-                            is GatewayState.Running -> MaterialTheme.colorScheme.primary to "Running"
-                            is GatewayState.Starting -> MaterialTheme.colorScheme.tertiary to "Starting..."
-                            is GatewayState.WaitingForUi -> MaterialTheme.colorScheme.tertiary to "Starting UI..."
-                            is GatewayState.Preparing -> MaterialTheme.colorScheme.tertiary to "Preparing..."
-                            is GatewayState.Downloading -> MaterialTheme.colorScheme.tertiary to "Downloading..."
-                            is GatewayState.Extracting -> MaterialTheme.colorScheme.tertiary to "Extracting..."
-                            is GatewayState.Idle -> MaterialTheme.colorScheme.onSurfaceVariant to "Stopped"
-                            is GatewayState.Error -> MaterialTheme.colorScheme.error to "Error"
+                            is GatewayState.Running -> MaterialTheme.colorScheme.primary to "运行中"
+                            is GatewayState.Starting -> MaterialTheme.colorScheme.tertiary to "启动中..."
+                            is GatewayState.WaitingForUi -> MaterialTheme.colorScheme.tertiary to "正在启动界面..."
+                            is GatewayState.Preparing -> MaterialTheme.colorScheme.tertiary to "准备中..."
+                            is GatewayState.Downloading -> MaterialTheme.colorScheme.tertiary to "下载中..."
+                            is GatewayState.Extracting -> MaterialTheme.colorScheme.tertiary to "解压中..."
+                            is GatewayState.Idle -> MaterialTheme.colorScheme.onSurfaceVariant to "已停止"
+                            is GatewayState.Error -> MaterialTheme.colorScheme.error to "出错"
                         }
                         Box(
                             modifier = Modifier
@@ -84,12 +84,12 @@ fun SettingsScreen(
                                 .background(statusColor, shape = CircleShape),
                         )
                         Text(
-                            text = "  Gateway: $statusText",
+                            text = "  引擎: $statusText",
                             style = MaterialTheme.typography.titleMedium,
                         )
                     }
                     Spacer(Modifier.height(8.dp))
-                    Text("Port: ${state.gatewayPort}", style = MaterialTheme.typography.bodyMedium)
+                    Text("端口: ${state.gatewayPort}", style = MaterialTheme.typography.bodyMedium)
                     if (state.gatewayState is GatewayState.Error) {
                         val scrollState = rememberScrollState()
                         Text(
@@ -105,11 +105,11 @@ fun SettingsScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         when (state.gatewayState) {
                             is GatewayState.Running -> {
-                                OutlinedButton(onClick = viewModel::stopGateway) { Text("Stop") }
-                                Button(onClick = viewModel::restartGateway) { Text("Restart") }
+                                OutlinedButton(onClick = viewModel::stopGateway) { Text("停止") }
+                                Button(onClick = viewModel::restartGateway) { Text("重启") }
                             }
                             is GatewayState.Idle, is GatewayState.Error -> {
-                                Button(onClick = viewModel::startGateway) { Text("Start") }
+                                Button(onClick = viewModel::startGateway) { Text("启动") }
                             }
                             else -> {}
                         }
@@ -120,14 +120,14 @@ fun SettingsScreen(
             // Provider info card
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Provider", style = MaterialTheme.typography.titleMedium)
+                    Text("服务商", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Provider: ${state.provider.ifEmpty { "Not configured" }}",
+                        "服务商: ${state.provider.ifEmpty { "未配置" }}",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
-                        "Model: ${state.model.ifEmpty { "Default" }}",
+                        "模型: ${state.model.ifEmpty { "默认" }}",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -136,11 +136,11 @@ fun SettingsScreen(
             // About card
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("About", style = MaterialTheme.typography.titleMedium)
+                    Text("关于", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
-                    Text("LilClaw (小爪子) v${com.lilclaw.app.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium)
+                    Text("小爪 (LilClaw) v${com.lilclaw.app.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "Powered by OpenClaw",
+                        "由 OpenClaw 驱动",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

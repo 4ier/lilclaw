@@ -31,3 +31,5 @@ web/tsconfig.tsbuildinfo
 
 # Monorepo root
 node_modules/
+app/src/main/assets/rootfs/*.bin
+app/src/main/assets/rootfs/*.tar.gz

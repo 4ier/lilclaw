@@ -40,7 +40,7 @@ class GatewayService : Service() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setContentTitle("LilClaw")
+                .setContentTitle("小爪")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.ic_menu_manage)
                 .setContentIntent(openIntent)
@@ -66,7 +66,7 @@ class GatewayService : Service() {
             return START_NOT_STICKY
         }
 
-        startForeground(NOTIFICATION_ID, buildNotification("Starting..."))
+        startForeground(NOTIFICATION_ID, buildNotification("启动中..."))
         return START_STICKY
     }
 
@@ -91,11 +91,11 @@ class GatewayService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("LilClaw")
+            .setContentTitle("小爪")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_manage)
             .setContentIntent(openIntent)
-            .addAction(android.R.drawable.ic_media_pause, "Stop", stopIntent)
+            .addAction(android.R.drawable.ic_media_pause, "停止", stopIntent)
             .setOngoing(true)
             .setSilent(true)
             .build()
@@ -104,10 +104,10 @@ class GatewayService : Service() {
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Gateway Service",
+            "小爪后台服务",
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "Keeps the AI gateway running"
+            description = "保持 AI 引擎运行"
             setShowBadge(false)
         }
         getSystemService(NotificationManager::class.java)

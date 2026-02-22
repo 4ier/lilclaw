@@ -74,6 +74,7 @@ object ConfigWriter {
         "anthropic" -> "anthropic"
         "deepseek" -> "deepseek"
         "aws bedrock" -> "amazon-bedrock"
+        "自定义" -> provider.lowercase()
         else -> provider.lowercase()
     }
 

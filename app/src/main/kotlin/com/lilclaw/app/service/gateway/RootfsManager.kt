@@ -94,11 +94,11 @@ class RootfsManager(private val context: Context) {
 
             if (hasAsset) {
                 onStateChange("preparing")
-                log("Unpacking ${layer.name}...")
+                log("正在解包 ${layer.name}...")
                 copyAssetToFile("rootfs/${layer.assetFile}", tarGzFile)
             } else {
                 onStateChange("downloading")
-                log("Downloading ${layer.name} (${layer.displaySize})...")
+                log("正在下载 ${layer.name} (${layer.displaySize})...")
                 downloadFile(layer.fallbackUrl, tarGzFile) { layerProgress ->
                     val layerDownloaded = (layer.sizeBytes * layerProgress).toLong()
                     _progress.value = ((completedBytes + layerDownloaded).toFloat() / totalBytes * 0.7f)
@@ -107,7 +107,7 @@ class RootfsManager(private val context: Context) {
             }
 
             onStateChange("extracting")
-            log("Installing ${layer.name}...")
+            log("正在安装 ${layer.name}...")
             extractTarGz(tarGzFile, rootfsDir)
             tarGzFile.delete()
 
@@ -117,7 +117,7 @@ class RootfsManager(private val context: Context) {
         }
 
         // Post-extraction setup
-        log("Configuring environment...")
+        log("配置环境...")
         _progress.value = 0.75f
         ConfigWriter.writeAndroidCompat(rootfsDir)
         ensureExecutable()
@@ -126,7 +126,7 @@ class RootfsManager(private val context: Context) {
         if (!isReady) {
             throw RuntimeException("Rootfs extraction failed: key binaries not found")
         }
-        log("Environment ready ✓")
+        log("环境就绪 ✓")
     }
 
     // ── Incremental updates (app restart) ─────────────────
@@ -158,12 +158,12 @@ class RootfsManager(private val context: Context) {
             if (hasAsset) {
                 copyAssetToFile("rootfs/${layer.assetFile}", tarGzFile)
             } else {
-                log("Downloading ${layer.name} (${layer.displaySize})...")
+                log("正在下载 ${layer.name} (${layer.displaySize})...")
                 downloadFile(layer.fallbackUrl, tarGzFile) { }
             }
             extractTarGz(tarGzFile, rootfsDir)
             tarGzFile.delete()
-            log("${layer.name} updated ✓")
+            log("${layer.name} 已更新 ✓")
         }
         mergeLayersJson(layers)
     }
@@ -286,7 +286,15 @@ class RootfsManager(private val context: Context) {
 
     // ── Private: assets ───────────────────────────────────
 
+    /**
+     * Check if an asset file exists. Tries the exact path first,
+     * then with ".bin" suffix (used to prevent AAPT from decompressing .tar.gz).
+     */
     private fun hasAssetFile(path: String): Boolean {
+        return tryOpenAsset(path) || tryOpenAsset("$path.bin")
+    }
+
+    private fun tryOpenAsset(path: String): Boolean {
         return try {
             context.assets.open(path).use { true }
         } catch (e: Exception) {
@@ -294,9 +302,17 @@ class RootfsManager(private val context: Context) {
         }
     }
 
+    /**
+     * Resolve the actual asset path, trying ".bin" suffix as fallback.
+     */
+    private fun resolveAssetPath(path: String): String {
+        return if (tryOpenAsset(path)) path else "$path.bin"
+    }
+
     private suspend fun copyAssetToFile(assetPath: String, target: File) = withContext(Dispatchers.IO) {
+        val resolved = resolveAssetPath(assetPath)
         target.parentFile?.mkdirs()
-        context.assets.open(assetPath).use { input ->
+        context.assets.open(resolved).use { input ->
             FileOutputStream(target).use { output ->
                 input.copyTo(output, bufferSize = 65536)
             }

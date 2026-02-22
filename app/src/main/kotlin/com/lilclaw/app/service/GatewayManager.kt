@@ -78,7 +78,7 @@ class GatewayManager(private val context: Context) {
                 if (!rootfs.isReady) {
                     _state.value = GatewayState.Preparing
                     _progress.value = 0f
-                    GatewayService.updateStatus(context, "Setting up...")
+                    GatewayService.updateStatus(context, "正在准备...")
 
                     rootfs.extractAll(
                         onStateChange = { phase ->
@@ -96,14 +96,14 @@ class GatewayManager(private val context: Context) {
                 launch { rootfs.progress.collect { _progress.value = it } }
 
                 // Phase 2: Write config
-                log("Writing configuration...")
+                log("写入配置...")
                 ConfigWriter.writeGatewayConfig(rootfs.rootfsDir, port, provider, apiKey, model)
-                log("Configuration written ✓")
+                log("配置完成 ✓")
                 _progress.value = 0.8f
 
                 // Phase 3: Start processes
                 _state.value = GatewayState.Starting
-                GatewayService.updateStatus(context, "Starting gateway...")
+                GatewayService.updateStatus(context, "正在启动引擎...")
                 startProcesses(port)
 
                 // Phase 4-5: Wait for ports
@@ -111,8 +111,8 @@ class GatewayManager(private val context: Context) {
 
             } catch (e: Exception) {
                 Log.e(TAG, "Bootstrap failed", e)
-                log("Error: ${e.message}")
-                _state.value = GatewayState.Error(e.message ?: "Unknown error")
+                log("错误: ${e.message}")
+                _state.value = GatewayState.Error(e.message ?: "未知错误")
             }
         }
     }
@@ -133,14 +133,14 @@ class GatewayManager(private val context: Context) {
                 GatewayService.start(context)
 
                 if (!rootfs.isReady) {
-                    _state.value = GatewayState.Error("Rootfs not ready")
+                    _state.value = GatewayState.Error("环境未就绪")
                     return@launch
                 }
 
                 // Check for layer updates
                 val stale = rootfs.getStaleLayers(::log)
                 if (stale.isNotEmpty()) {
-                    log("Updating ${stale.joinToString { it.name }}...")
+                    log("正在更新 ${stale.joinToString { it.name }}...")
                     rootfs.updateLayers(stale, ::log)
                 }
 
@@ -151,7 +151,7 @@ class GatewayManager(private val context: Context) {
                 // Start processes
                 _state.value = GatewayState.Starting
                 _progress.value = 0.3f
-                GatewayService.updateStatus(context, "Starting gateway...")
+                GatewayService.updateStatus(context, "正在启动引擎...")
                 rootfs.ensureExecutable()
                 startProcesses(port)
 
@@ -160,8 +160,8 @@ class GatewayManager(private val context: Context) {
 
             } catch (e: Exception) {
                 Log.e(TAG, "Quick start failed", e)
-                log("Error: ${e.message}")
-                _state.value = GatewayState.Error(e.message ?: "Unknown error")
+                log("错误: ${e.message}")
+                _state.value = GatewayState.Error(e.message ?: "未知错误")
             }
         }
     }
@@ -187,17 +187,17 @@ class GatewayManager(private val context: Context) {
     // ── Private helpers ───────────────────────────────────
 
     private suspend fun startProcesses(port: Int) {
-        log("Starting gateway...")
+        log("启动 AI 引擎...")
         val gwProcess = processes.startGateway(port)
         pumpProcessLog(gwProcess, "gw")
 
-        log("Starting Chat UI...")
+        log("启动聊天界面...")
         val uiProcess = processes.startServeUi()
         if (uiProcess != null) {
             pumpProcessLog(uiProcess, "ui")
-            log("Chat UI server started")
+            log("聊天界面已启动")
         } else {
-            log("serve-ui.cjs not found, skipping Chat UI server")
+            log("serve-ui.cjs 未找到，跳过聊天界面")
         }
     }
 
@@ -219,18 +219,18 @@ class GatewayManager(private val context: Context) {
     }
 
     private suspend fun waitForReady(port: Int, onReady: () -> Unit) {
-        log("Waiting for gateway...")
+        log("等待引擎就绪...")
         waitForPort(port, timeoutMs = 60_000)
         _progress.value = 0.9f
 
         _state.value = GatewayState.WaitingForUi
-        log("Waiting for Chat UI...")
+        log("等待界面就绪...")
         waitForPort(3001, timeoutMs = 30_000)
         _progress.value = 1f
 
-        log("Ready")
+        log("就绪")
         _state.value = GatewayState.Running
-        GatewayService.updateStatus(context, "Running")
+        GatewayService.updateStatus(context, "运行中")
         onReady()
     }
 

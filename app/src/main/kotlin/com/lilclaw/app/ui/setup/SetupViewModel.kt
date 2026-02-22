@@ -18,7 +18,7 @@ data class SetupState(
     val progress: Float = 0f,
     val logLines: List<String> = emptyList(),
     val error: String? = null,
-    val statusText: String = "Setting things up...",
+    val statusText: String = "正在准备...",
 )
 
 enum class SetupStep {
@@ -50,7 +50,7 @@ class SetupViewModel(
                             _state.update {
                                 it.copy(
                                     step = SetupStep.LAUNCHING,
-                                    statusText = "Waking up...",
+                                    statusText = "正在唤醒...",
                                 )
                             }
                             startQuick()
@@ -60,7 +60,7 @@ class SetupViewModel(
                             _state.update {
                                 it.copy(
                                     step = SetupStep.LAUNCHING,
-                                    statusText = "Starting...",
+                                    statusText = "启动中...",
                                 )
                             }
                         }
@@ -84,14 +84,14 @@ class SetupViewModel(
                     if (current.step != SetupStep.LAUNCHING) return@update current
 
                     val statusText = when (gwState) {
-                        is GatewayState.Preparing -> "Setting things up..."
-                        is GatewayState.Downloading -> "Downloading components..."
-                        is GatewayState.Extracting -> "Installing..."
-                        is GatewayState.Starting -> "Starting AI engine..."
-                        is GatewayState.WaitingForUi -> "Almost ready..."
-                        is GatewayState.Running -> "Here we go!"
-                        is GatewayState.Error -> "Something went wrong"
-                        is GatewayState.Idle -> "Preparing..."
+                        is GatewayState.Preparing -> "正在准备..."
+                        is GatewayState.Downloading -> "正在下载组件..."
+                        is GatewayState.Extracting -> "正在安装..."
+                        is GatewayState.Starting -> "正在启动 AI 引擎..."
+                        is GatewayState.WaitingForUi -> "马上就好..."
+                        is GatewayState.Running -> "准备就绪！"
+                        is GatewayState.Error -> "出了点问题"
+                        is GatewayState.Idle -> "准备中..."
                     }
                     current.copy(
                         statusText = statusText,
@@ -140,7 +140,7 @@ class SetupViewModel(
                 progress = 0f,
                 logLines = emptyList(),
                 error = null,
-                statusText = "Setting things up...",
+                statusText = "正在准备...",
             )
         }
 
@@ -163,7 +163,7 @@ class SetupViewModel(
                 progress = 0f,
                 logLines = emptyList(),
                 error = null,
-                statusText = "Retrying...",
+                statusText = "正在重试...",
             )
         }
         viewModelScope.launch {

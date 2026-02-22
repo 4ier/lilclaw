@@ -68,7 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.koin.androidx.compose.koinViewModel
 
-private val PROVIDERS = listOf("OpenAI", "Anthropic", "DeepSeek", "AWS Bedrock", "Custom")
+private val PROVIDERS = listOf("DeepSeek", "OpenAI", "Anthropic", "AWS Bedrock", "自定义")
 
 @Composable
 fun SetupScreen(
@@ -151,12 +151,12 @@ private fun WelcomeStep(onNext: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         Text(
-            text = "LilClaw",
+            text = "小爪",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
         )
         Text(
-            text = "小爪子",
+            text = "LilClaw",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -164,7 +164,7 @@ private fun WelcomeStep(onNext: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         Text(
-            text = "Your pocket AI gateway",
+            text = "你的口袋 AI 助手",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -179,7 +179,7 @@ private fun WelcomeStep(onNext: () -> Unit) {
                 .height(52.dp),
             shape = RoundedCornerShape(16.dp),
         ) {
-            Text("Get Started", style = MaterialTheme.typography.titleMedium)
+            Text("开始使用", style = MaterialTheme.typography.titleMedium)
         }
     }
 }
@@ -207,13 +207,13 @@ private fun ProviderStep(
         Spacer(Modifier.height(24.dp))
 
         Text(
-            text = "Connect your AI",
+            text = "连接 AI 服务",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "Choose a provider and enter your API key",
+            text = "选择服务商，输入你的 API Key",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -255,7 +255,7 @@ private fun ProviderStep(
         OutlinedTextField(
             value = state.model,
             onValueChange = onModelChanged,
-            label = { Text("Model (optional)") },
+            label = { Text("模型（选填）") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = {
@@ -279,7 +279,7 @@ private fun ProviderStep(
                 .height(52.dp),
             shape = RoundedCornerShape(16.dp),
         ) {
-            Text("Continue", style = MaterialTheme.typography.titleMedium)
+            Text("继续", style = MaterialTheme.typography.titleMedium)
         }
     }
 }
@@ -369,7 +369,7 @@ private fun LaunchingStep(
                     onClick = onRetry,
                     shape = RoundedCornerShape(12.dp),
                 ) {
-                    Text("Try Again")
+                    Text("重试")
                 }
             }
 
