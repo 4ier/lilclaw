@@ -381,7 +381,7 @@ export const useStore = create<AppState>()(
 )
 
 // Initialize theme on load
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && document.documentElement) {
   const stored = localStorage.getItem('lilclaw-chat-storage')
   if (stored) {
     try {
