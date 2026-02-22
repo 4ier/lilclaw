@@ -47,9 +47,9 @@ class RootfsManager(private val context: Context) {
                 43_335_483L, "42 MB"
             ),
             LayerInfo(
-                "chatspa", "chatspa-0.6.0.tar.gz",
-                "$RELEASES_BASE/chatspa-0.6.0.tar.gz",
-                247_612L, "242 KB"
+                "chatspa", "chatspa-0.6.1.tar.gz",
+                "$RELEASES_BASE/chatspa-0.6.1.tar.gz",
+                249_099L, "242 KB"
             ),
             LayerInfo(
                 "config", "config-0.1.0.tar.gz",
