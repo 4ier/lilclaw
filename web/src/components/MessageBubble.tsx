@@ -7,6 +7,8 @@ import type { MessageContent } from '../lib/gateway'
 import { formatRelativeTime } from '../lib/formatTime'
 import { useStore } from '../store'
 import ContextMenu, { type ContextMenuItem } from './ContextMenu'
+import ImageLightbox from './ImageLightbox'
+import { showToast } from './Toast'
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant'
@@ -155,6 +157,7 @@ export default function MessageBubble({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const bubbleRef = useRef<HTMLDivElement>(null)
@@ -250,7 +253,8 @@ export default function MessageBubble({
                 key={i}
                 src={img.url}
                 alt="Content"
-                className="max-w-full rounded-lg mb-2"
+                className="max-w-full rounded-lg mb-2 cursor-pointer active:opacity-80 transition-opacity"
+                onClick={(e) => { e.stopPropagation(); setLightboxSrc(img.url!) }}
               />
             ))}
 
@@ -312,9 +316,11 @@ export default function MessageBubble({
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  navigator.clipboard.writeText(textContent)
-                  setCopied(true)
-                  setTimeout(() => setCopied(false), 1500)
+                  navigator.clipboard.writeText(textContent).then(() => {
+                    setCopied(true)
+                    showToast('已复制到剪贴板', 'success')
+                    setTimeout(() => setCopied(false), 1500)
+                  })
                 }}
                 className="text-[12px] text-gray-400 dark:text-gray-500 active:text-amber-700 dark:active:text-amber-500 transition-colors"
               >
@@ -344,6 +350,11 @@ export default function MessageBubble({
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
         />
+      )}
+
+      {/* Image lightbox */}
+      {lightboxSrc && (
+        <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       )}
     </>
   )

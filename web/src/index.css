@@ -369,6 +369,16 @@
   51%, 100% { opacity: 0; }
 }
 
+@keyframes send-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.85); }
+  100% { transform: scale(1); }
+}
+
+.animate-send-pulse {
+  animation: send-pulse 200ms ease-out;
+}
+
 .cursor-blink::after {
   content: "▋";
   animation: blink 1s step-end infinite;
