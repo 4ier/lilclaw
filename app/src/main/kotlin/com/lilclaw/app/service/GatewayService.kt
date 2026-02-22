@@ -40,7 +40,7 @@ class GatewayService : Service() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setContentTitle("LilClaw")
+                .setContentTitle("小爪")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.ic_menu_manage)
                 .setContentIntent(openIntent)
@@ -91,7 +91,7 @@ class GatewayService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("LilClaw")
+            .setContentTitle("小爪")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_manage)
             .setContentIntent(openIntent)
@@ -104,10 +104,10 @@ class GatewayService : Service() {
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Gateway Service",
+            "AI 服务",
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "Keeps the AI gateway running"
+            description = "保持 AI 助手在后台运行"
             setShowBadge(false)
         }
         getSystemService(NotificationManager::class.java)
@@ -120,7 +120,7 @@ class GatewayService : Service() {
             PowerManager.PARTIAL_WAKE_LOCK,
             "LilClaw::GatewayWakeLock",
         ).apply {
-            acquire(10 * 60 * 1000L)
+            acquire() // No timeout — release only when service stops
         }
     }
 
