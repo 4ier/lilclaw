@@ -26,12 +26,15 @@ export default function App() {
         },
       }))
     } else {
-      // Load cached messages first (instant), then connect to gateway (async)
       loadCachedMessages().then(() => {
         connect()
       })
     }
-  }, [connect, loadCachedMessages])
+    return () => {
+      // Cleanup: disconnect on unmount (prevents double WS in StrictMode)
+      useStore.getState().disconnect()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden bg-white dark:bg-[#1a1410]">
