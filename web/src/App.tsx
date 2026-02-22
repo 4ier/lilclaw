@@ -4,6 +4,7 @@ import ChatScreen from './components/ChatScreen'
 import SessionDrawer from './components/SessionDrawer'
 import Settings from './components/Settings'
 import Welcome from './components/Welcome'
+import ToastContainer from './components/Toast'
 import { mockConversation } from './lib/mockData'
 
 const USE_MOCK = new URLSearchParams(window.location.search).has('mock')
@@ -43,6 +44,7 @@ export default function App() {
       <SessionDrawer />
       {showSettings && <Settings />}
       <Welcome />
+      <ToastContainer />
     </div>
   )
 }

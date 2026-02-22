@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { showToast } from '../components/Toast'
 import {
   GatewayClient,
   type ConnectionState,
@@ -157,6 +158,14 @@ export const useStore = create<AppState>()(
             },
             onError: (error) => {
               console.error('Gateway error:', error)
+              const msg = typeof error === 'string' ? error : (error as Error)?.message || ''
+              if (msg.includes('401') || msg.includes('auth')) {
+                showToast('连接验证失败，请检查设置', 'error')
+              } else if (msg.includes('timeout') || msg.includes('ECONNREFUSED')) {
+                showToast('连接超时，正在重试...', 'error')
+              } else if (msg) {
+                showToast('连接出错，正在重试...', 'error')
+              }
             },
           },
           state.gatewayPort,
