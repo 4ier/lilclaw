@@ -13,13 +13,17 @@ export default function Settings() {
   const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
         setShowSettings(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchend', handleClickOutside, { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchend', handleClickOutside)
+    }
   }, [setShowSettings])
 
   useEffect(() => {
@@ -54,7 +58,7 @@ export default function Settings() {
           <button
             onClick={() => setShowSettings(false)}
             className="touch-target flex items-center justify-center p-2 -mr-2 rounded-lg active:bg-gray-100 dark:active:bg-gray-800"
-            aria-label="Close"
+            aria-label="Close settings"
           >
             <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
