@@ -146,7 +146,11 @@ export default function SessionDrawer() {
   } = useStore()
 
   const drawerRef = useRef<HTMLDivElement>(null)
-  const close = useCallback(() => setShowDrawer(false), [setShowDrawer])
+  const [search, setSearch] = useState('')
+  const close = useCallback(() => {
+    setShowDrawer(false)
+    setSearch('')
+  }, [setShowDrawer])
 
   useEffect(() => {
     if (!showDrawer) return
@@ -175,6 +179,13 @@ export default function SessionDrawer() {
   const displaySessions = sessions.length > 0
     ? sessions
     : [{ key: currentSessionKey }]
+
+  const filteredSessions = search.trim()
+    ? displaySessions.filter((s) => {
+        const name = getSessionDisplayName(s.key).toLowerCase()
+        return name.includes(search.toLowerCase())
+      })
+    : displaySessions
 
   return (
     <div
@@ -215,8 +226,21 @@ export default function SessionDrawer() {
           </button>
         </div>
 
+        {/* Search */}
+        {displaySessions.length > 3 && (
+          <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search sessions..."
+              className="w-full px-3 py-1.5 text-[13px] rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-amber-700/40"
+            />
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto py-1">
-          {displaySessions.map((session) => {
+          {filteredSessions.map((session) => {
             const isActive = session.key === currentSessionKey
             return (
               <SessionItem
