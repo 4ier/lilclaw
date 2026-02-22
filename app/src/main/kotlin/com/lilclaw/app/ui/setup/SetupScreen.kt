@@ -1,5 +1,10 @@
 package com.lilclaw.app.ui.setup
 
+import android.text.InputType
+import android.text.method.PasswordTransformationMethod
+import android.view.inputmethod.EditorInfo
+import android.widget.EditText
+import android.widget.LinearLayout
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -33,15 +38,12 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,15 +59,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.widget.doAfterTextChanged
 import org.koin.androidx.compose.koinViewModel
 
 private val PROVIDERS = listOf("OpenAI", "Anthropic", "DeepSeek", "AWS Bedrock", "Custom")
@@ -195,7 +197,8 @@ private fun ProviderStep(
     onModelChanged: (String) -> Unit,
     onContinue: () -> Unit,
 ) {
-    val focusManager = LocalFocusManager.current
+    val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
+    val hintColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -236,43 +239,81 @@ private fun ProviderStep(
 
         Spacer(Modifier.height(24.dp))
 
-        OutlinedTextField(
-            value = state.apiKey,
-            onValueChange = onApiKeyChanged,
-            label = { Text("API Key") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Password,
-                imeAction = ImeAction.Next,
-            ),
+        // API Key — native EditText for adb input text compatibility
+        AndroidView(
+            factory = { ctx ->
+                EditText(ctx).apply {
+                    hint = "API Key"
+                    inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                    imeOptions = EditorInfo.IME_ACTION_NEXT
+                    maxLines = 1
+                    setSingleLine(true)
+                    setTextColor(textColor)
+                    setHintTextColor(hintColor)
+                    textSize = 16f
+                    setPadding(32, 24, 32, 24)
+                    background = ctx.getDrawable(android.R.drawable.edit_text)
+                    transformationMethod = PasswordTransformationMethod.getInstance()
+                    doAfterTextChanged { editable ->
+                        onApiKeyChanged(editable?.toString() ?: "")
+                    }
+                }
+            },
+            update = { editText ->
+                // Only update if truly different (avoid cursor jump)
+                val current = editText.text?.toString() ?: ""
+                if (current != state.apiKey) {
+                    editText.setText(state.apiKey)
+                    editText.setSelection(state.apiKey.length)
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
         )
 
         Spacer(Modifier.height(12.dp))
 
-        OutlinedTextField(
-            value = state.model,
-            onValueChange = onModelChanged,
-            label = { Text("Model (optional)") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = {
-                focusManager.clearFocus()
-                if (state.provider.isNotEmpty() && state.apiKey.isNotEmpty()) onContinue()
-            }),
+        // Model — native EditText for adb input text compatibility
+        AndroidView(
+            factory = { ctx ->
+                EditText(ctx).apply {
+                    hint = "Model (optional)"
+                    inputType = InputType.TYPE_CLASS_TEXT
+                    imeOptions = EditorInfo.IME_ACTION_DONE
+                    maxLines = 1
+                    setSingleLine(true)
+                    setTextColor(textColor)
+                    setHintTextColor(hintColor)
+                    textSize = 16f
+                    setPadding(32, 24, 32, 24)
+                    background = ctx.getDrawable(android.R.drawable.edit_text)
+                    doAfterTextChanged { editable ->
+                        onModelChanged(editable?.toString() ?: "")
+                    }
+                    setOnEditorActionListener { _, actionId, _ ->
+                        if (actionId == EditorInfo.IME_ACTION_DONE) {
+                            clearFocus()
+                            if (state.provider.isNotEmpty() && state.apiKey.isNotEmpty()) {
+                                onContinue()
+                            }
+                            true
+                        } else false
+                    }
+                }
+            },
+            update = { editText ->
+                val current = editText.text?.toString() ?: ""
+                if (current != state.model) {
+                    editText.setText(state.model)
+                    editText.setSelection(state.model.length)
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
         )
 
         Spacer(Modifier.height(40.dp))
 
         Button(
-            onClick = {
-                focusManager.clearFocus()
-                onContinue()
-            },
+            onClick = onContinue,
             enabled = state.provider.isNotEmpty() && state.apiKey.isNotEmpty(),
             modifier = Modifier
                 .fillMaxWidth()
