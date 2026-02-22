@@ -1,6 +1,6 @@
 #!/bin/bash
 # verify-apk.sh — 构建后自动验证 APK，卡住低级错误
-set -euo pipefail
+set -uo pipefail
 
 APK_DIR="app/build/outputs/apk/debug"
 APK=$(ls "$APK_DIR"/lilclaw-v*.apk 2>/dev/null | head -1)
@@ -38,7 +38,7 @@ echo "$APK" | grep -q "$GRADLE_VERSION" && check 0 "Version matches gradle ($GRA
 
 # 4. Version > latest GitHub release
 if command -v gh &>/dev/null; then
-    GH_VERSION=$(gh release list --limit 1 -q '.[0].tagName' --json tagName 2>/dev/null | sed 's/^v//')
+    GH_VERSION=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null | sed 's/^v//' || echo "")
     if [ -n "$GH_VERSION" ]; then
         if [ "$(printf '%s\n' "$GH_VERSION" "$GRADLE_VERSION" | sort -V | tail -1)" = "$GRADLE_VERSION" ]; then
             check 0 "Version $GRADLE_VERSION ≥ GitHub latest $GH_VERSION"
