@@ -5,25 +5,47 @@ import ActionCards from './ActionCards'
 import type { ActionCard } from '../lib/actions'
 
 function ConnectionBanner() {
-  const { connectionState, cacheLoaded } = useStore()
+  const { connectionState, cacheLoaded, pendingMessages } = useStore()
+  const pendingCount = pendingMessages.length
 
-  if (connectionState === 'connected') return null
+  if (connectionState === 'connected' && pendingCount === 0) return null
+
+  // Connected but flushing
+  if (connectionState === 'connected' && pendingCount > 0) {
+    return (
+      <div className="flex items-center justify-center gap-2 px-4 py-1.5 text-[12px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 flex-shrink-0">
+        <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        <span>Sending {pendingCount} queued message{pendingCount > 1 ? 's' : ''}...</span>
+      </div>
+    )
+  }
 
   const config: Record<string, { color: string; bg: string; label: string }> = {
     connecting: {
       color: 'text-amber-700 dark:text-amber-400',
       bg: 'bg-amber-50 dark:bg-amber-900/20',
-      label: cacheLoaded ? 'Connecting to gateway...' : 'Loading...',
+      label: cacheLoaded
+        ? pendingCount > 0
+          ? `Connecting... (${pendingCount} message${pendingCount > 1 ? 's' : ''} queued)`
+          : 'Connecting to gateway...'
+        : 'Loading...',
     },
     disconnected: {
       color: 'text-gray-500 dark:text-gray-400',
       bg: 'bg-gray-50 dark:bg-gray-800',
-      label: 'Gateway offline',
+      label: pendingCount > 0
+        ? `Offline · ${pendingCount} message${pendingCount > 1 ? 's' : ''} queued`
+        : 'Gateway offline',
     },
     error: {
       color: 'text-red-600 dark:text-red-400',
       bg: 'bg-red-50 dark:bg-red-900/20',
-      label: 'Connection error — retrying...',
+      label: pendingCount > 0
+        ? `Connection error · ${pendingCount} queued — retrying...`
+        : 'Connection error — retrying...',
     },
   }
 
@@ -215,7 +237,7 @@ export default function ChatScreen() {
   const handleSubmit = useCallback((e: FormEvent) => {
     e.preventDefault()
     const trimmed = input.trim()
-    if (!trimmed || connectionState !== 'connected') return
+    if (!trimmed) return
     setInput('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
 
@@ -227,7 +249,7 @@ export default function ChatScreen() {
     }
 
     sendMessage(finalMessage)
-  }, [input, connectionState, sendMessage, activeAction])
+  }, [input, sendMessage, activeAction])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -301,9 +323,7 @@ export default function ChatScreen() {
               <ellipse cx="50" cy="55" rx="18" ry="20" />
             </svg>
             <p className="text-base font-medium text-gray-500 dark:text-gray-400 mb-6">What can I help with?</p>
-            {connectionState === 'connected' && (
-              <ActionCards onSelect={handleActionSelect} />
-            )}
+            <ActionCards onSelect={handleActionSelect} />
           </div>
         )}
 
@@ -418,11 +438,10 @@ export default function ChatScreen() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={activeAction ? activeAction.description : 'Message...'}
+            placeholder={activeAction ? activeAction.description : connectionState === 'connected' ? 'Message...' : 'Message (will send when connected)...'}
             rows={1}
             className="flex-1 resize-none px-3.5 py-2.5 rounded-[20px] border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#231c14] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-700/40 dark:focus:ring-amber-600/40 focus:border-amber-400 dark:focus:border-amber-700 text-[15px]"
             style={{ maxHeight: '120px', overflow: 'auto' }}
-            disabled={connectionState !== 'connected'}
           />
 
           {generating ? (
@@ -439,7 +458,7 @@ export default function ChatScreen() {
           ) : (
             <button
               type="submit"
-              disabled={!input.trim() || connectionState !== 'connected'}
+              disabled={!input.trim()}
               onMouseDown={(e) => e.preventDefault()}
               className="flex items-center justify-center p-2.5 rounded-full bg-amber-800 text-white disabled:opacity-30 active:bg-amber-950 active:scale-95 transition-all"
               aria-label="Send message"

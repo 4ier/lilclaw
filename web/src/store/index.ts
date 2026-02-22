@@ -33,6 +33,9 @@ interface AppState {
   // Typing: user sent message, waiting for first response
   typing: Record<string, boolean>
 
+  // Offline message queue
+  pendingMessages: Array<{ sessionKey: string; message: string; timestamp: number }>
+
   // UI
   showDrawer: boolean
   showSettings: boolean
@@ -56,6 +59,7 @@ interface AppState {
   retryLastMessage: () => void
   deleteSession: (sessionKey: string) => void
   loadCachedMessages: () => Promise<void>
+  flushPendingMessages: () => Promise<void>
 
   setShowDrawer: (show: boolean) => void
   setShowSettings: (show: boolean) => void
@@ -97,6 +101,8 @@ export const useStore = create<AppState>()(
               if (connectionState === 'connected') {
                 get().loadSessions()
                 get().loadHistory()
+                // Flush any messages queued while offline
+                get().flushPendingMessages()
               }
             },
             onChatEvent: (rawSessionKey, eventState, content) => {
@@ -168,6 +174,7 @@ export const useStore = create<AppState>()(
         streaming: {},
         agentState: {},
         typing: {},
+        pendingMessages: [],
         showDrawer: false,
         showSettings: false,
         theme: 'system',
@@ -203,7 +210,7 @@ export const useStore = create<AppState>()(
         },
 
         sendMessage: async (message: string) => {
-          const { currentSessionKey } = get()
+          const { currentSessionKey, connectionState } = get()
 
           const userMessage: ChatMessage = {
             role: 'user',
@@ -211,6 +218,7 @@ export const useStore = create<AppState>()(
             timestamp: Date.now(),
           }
 
+          // Always add message to local state immediately (optimistic)
           set((state) => {
             const newMessages = [
               ...(state.messages[currentSessionKey] || []),
@@ -219,14 +227,32 @@ export const useStore = create<AppState>()(
             debouncedPersist(currentSessionKey, newMessages)
             return {
               messages: { ...state.messages, [currentSessionKey]: newMessages },
-              typing: { ...state.typing, [currentSessionKey]: true },
+              typing: { ...state.typing, [currentSessionKey]: connectionState === 'connected' },
               sessions: state.sessions.map((s) =>
                 s.key === currentSessionKey ? { ...s, lastActivity: Date.now() } : s
               ),
             }
           })
 
-          await client?.sendMessage(currentSessionKey, message)
+          if (connectionState === 'connected') {
+            // Online: send immediately
+            try {
+              await client?.sendMessage(currentSessionKey, message)
+            } catch {
+              // Failed to send — queue it
+              set((state) => ({
+                pendingMessages: [...state.pendingMessages, { sessionKey: currentSessionKey, message, timestamp: Date.now() }],
+                typing: { ...state.typing, [currentSessionKey]: false },
+              }))
+              return
+            }
+          } else {
+            // Offline: queue for later
+            set((state) => ({
+              pendingMessages: [...state.pendingMessages, { sessionKey: currentSessionKey, message, timestamp: Date.now() }],
+            }))
+            return
+          }
 
           // Auto-name session: if first user message and no label yet
           const state = get()
@@ -235,13 +261,11 @@ export const useStore = create<AppState>()(
           const sessionInfo = state.sessions.find((s) => s.key === currentSessionKey)
           if (userMessages.length === 1 && !sessionInfo?.label) {
             const label = message.length > 30 ? message.slice(0, 30) + '…' : message
-            // Update locally immediately
             set((state) => ({
               sessions: state.sessions.map((s) =>
                 s.key === currentSessionKey ? { ...s, label } : s
               ),
             }))
-            // Also try to update on gateway (may fail for client-created sessions, that's OK)
             client?.patchSession(currentSessionKey, { label }).catch(() => {})
           }
         },
@@ -334,9 +358,48 @@ export const useStore = create<AppState>()(
             return {
               messages: newMessages,
               sessions: newSessions,
+              pendingMessages: state.pendingMessages.filter((p) => p.sessionKey !== sessionKey),
               currentSessionKey: needSwitch ? (newSessions[0]?.key || 'main') : state.currentSessionKey,
             }
           })
+        },
+
+        flushPendingMessages: async () => {
+          const { pendingMessages } = get()
+          if (pendingMessages.length === 0) return
+
+          // Take all pending and clear the queue
+          set({ pendingMessages: [] })
+
+          for (const pending of pendingMessages) {
+            try {
+              set((state) => ({
+                typing: { ...state.typing, [pending.sessionKey]: true },
+              }))
+              await client?.sendMessage(pending.sessionKey, pending.message)
+
+              // Auto-name if needed
+              const state = get()
+              const sessionMessages = state.messages[pending.sessionKey] || []
+              const userMessages = sessionMessages.filter((m) => m.role === 'user')
+              const sessionInfo = state.sessions.find((s) => s.key === pending.sessionKey)
+              if (userMessages.length <= 1 && !sessionInfo?.label) {
+                const label = pending.message.length > 30 ? pending.message.slice(0, 30) + '…' : pending.message
+                set((state) => ({
+                  sessions: state.sessions.map((s) =>
+                    s.key === pending.sessionKey ? { ...s, label } : s
+                  ),
+                }))
+                client?.patchSession(pending.sessionKey, { label }).catch(() => {})
+              }
+            } catch {
+              // Re-queue failed messages
+              set((state) => ({
+                pendingMessages: [...state.pendingMessages, pending],
+                typing: { ...state.typing, [pending.sessionKey]: false },
+              }))
+            }
+          }
         },
 
         setShowDrawer: (show: boolean) => set({ showDrawer: show }),
