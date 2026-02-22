@@ -9,7 +9,7 @@ declare global {
 }
 
 export default function Settings() {
-  const { theme, connectionState, setShowSettings, setTheme } = useStore()
+  const { theme, fontSize, connectionState, setShowSettings, setTheme, setFontSize } = useStore()
   const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -87,6 +87,31 @@ export default function Settings() {
                   {opt.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Font Size */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+              字号大小
+            </label>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] text-gray-400 flex-shrink-0">小</span>
+              <input
+                type="range"
+                min={14}
+                max={22}
+                step={1}
+                value={fontSize}
+                onChange={(e) => setFontSize(Number(e.target.value))}
+                className="flex-1 h-1.5 rounded-full appearance-none bg-gray-200 dark:bg-gray-700 accent-amber-700 dark:accent-amber-500"
+              />
+              <span className="text-[16px] text-gray-400 flex-shrink-0">大</span>
+            </div>
+            <div className="mt-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+              <p style={{ fontSize: `${fontSize}px`, lineHeight: 1.6 }} className="text-gray-700 dark:text-gray-300">
+                预览文字效果 ({fontSize}px)
+              </p>
             </div>
           </div>
 

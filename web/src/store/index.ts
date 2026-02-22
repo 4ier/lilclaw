@@ -40,6 +40,7 @@ interface AppState {
   showDrawer: boolean
   showSettings: boolean
   theme: 'system' | 'light' | 'dark'
+  fontSize: number  // 14-22, default 16
   cacheLoaded: boolean
 
   // Client
@@ -64,6 +65,7 @@ interface AppState {
   setShowDrawer: (show: boolean) => void
   setShowSettings: (show: boolean) => void
   setTheme: (theme: 'system' | 'light' | 'dark') => void
+  setFontSize: (size: number) => void
   updateSettings: (port: number, token: string) => void
 
   // Helpers
@@ -178,6 +180,7 @@ export const useStore = create<AppState>()(
         showDrawer: false,
         showSettings: false,
         theme: 'system',
+        fontSize: 16,
         cacheLoaded: false,
         client: null,
 
@@ -417,6 +420,12 @@ export const useStore = create<AppState>()(
           }
         },
 
+        setFontSize: (size: number) => {
+          const clamped = Math.max(14, Math.min(22, size))
+          set({ fontSize: clamped })
+          document.documentElement.style.fontSize = `${clamped}px`
+        },
+
         updateSettings: (port: number, token: string) => {
           set({ gatewayPort: port, authToken: token })
           client?.updateConfig(port, token)
@@ -446,6 +455,7 @@ export const useStore = create<AppState>()(
         authToken: state.authToken,
         currentSessionKey: state.currentSessionKey,
         theme: state.theme,
+        fontSize: state.fontSize,
       }),
     }
   )
@@ -462,6 +472,9 @@ if (typeof window !== 'undefined' && document.documentElement) {
       } else if (state?.theme !== 'light') {
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
         document.documentElement.classList.toggle('dark', prefersDark)
+      }
+      if (state?.fontSize) {
+        document.documentElement.style.fontSize = `${state.fontSize}px`
       }
     } catch {
       // Ignore
