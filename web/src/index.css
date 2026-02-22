@@ -38,8 +38,10 @@
 
 @layer components {
   .message-bubble {
-    @apply px-3.5 py-2.5 max-w-[88%];
+    @apply px-3.5 py-2.5;
     border-radius: 18px;
+    max-width: 88%;
+    width: fit-content;
   }
 
   .message-bubble-user {

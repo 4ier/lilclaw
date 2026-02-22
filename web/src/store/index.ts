@@ -225,16 +225,21 @@ export const useStore = create<AppState>()(
 
           await client?.sendMessage(currentSessionKey, message)
 
-          // Auto-name session
+          // Auto-name session: if first user message and no label yet
           const state = get()
           const sessionMessages = state.messages[currentSessionKey] || []
           const userMessages = sessionMessages.filter((m) => m.role === 'user')
           const sessionInfo = state.sessions.find((s) => s.key === currentSessionKey)
           if (userMessages.length === 1 && !sessionInfo?.label) {
             const label = message.length > 30 ? message.slice(0, 30) + '…' : message
-            client?.patchSession(currentSessionKey, { label }).then(() => {
-              get().loadSessions()
-            }).catch(() => {})
+            // Update locally immediately
+            set((state) => ({
+              sessions: state.sessions.map((s) =>
+                s.key === currentSessionKey ? { ...s, label } : s
+              ),
+            }))
+            // Also try to update on gateway (may fail for client-created sessions, that's OK)
+            client?.patchSession(currentSessionKey, { label }).catch(() => {})
           }
         },
 

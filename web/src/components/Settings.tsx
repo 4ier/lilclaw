@@ -4,11 +4,12 @@ import { useStore } from '../store'
 declare global {
   interface Window {
     LilClaw?: { openSettings: () => void }
+    __LILCLAW_VERSION?: string
   }
 }
 
 export default function Settings() {
-  const { theme, setShowSettings, setTheme } = useStore()
+  const { theme, connectionState, setShowSettings, setTheme } = useStore()
   const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -35,22 +36,24 @@ export default function Settings() {
     { value: 'dark', label: 'Dark' },
   ] as const
 
+  const appVersion = window.__LILCLAW_VERSION || 'dev'
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" />
 
       <div
         ref={modalRef}
-        className="relative w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden animate-fade-in"
+        className="relative w-full max-w-sm bg-white dark:bg-[#1e1812] rounded-2xl shadow-2xl overflow-hidden animate-fade-in"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 dark:border-gray-800">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Settings
           </h2>
           <button
             onClick={() => setShowSettings(false)}
-            className="touch-target flex items-center justify-center p-2 -mr-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="touch-target flex items-center justify-center p-2 -mr-2 rounded-lg active:bg-gray-100 dark:active:bg-gray-800"
             aria-label="Close"
           >
             <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -60,7 +63,7 @@ export default function Settings() {
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-5">
           {/* Theme */}
           <div>
             <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
@@ -71,10 +74,10 @@ export default function Settings() {
                 <button
                   key={opt.value}
                   onClick={() => setTheme(opt.value)}
-                  className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium transition-all touch-target ${
+                  className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium transition-all ${
                     theme === opt.value
                       ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-lg'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 active:bg-gray-200 dark:active:bg-gray-700'
                   }`}
                 >
                   {opt.label}
@@ -90,7 +93,7 @@ export default function Settings() {
                 setShowSettings(false)
                 window.LilClaw?.openSettings()
               }}
-              className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-target"
+              className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 active:bg-gray-100 dark:active:bg-gray-800 transition-colors"
             >
               <div className="flex items-center gap-3">
                 <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -103,13 +106,40 @@ export default function Settings() {
               </svg>
             </button>
           )}
+
+          {/* Status */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">
+              Status
+            </label>
+            <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] text-gray-500 dark:text-gray-400">Gateway</span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    connectionState === 'connected' ? 'bg-emerald-500' :
+                    connectionState === 'connecting' ? 'bg-amber-500 animate-pulse' :
+                    'bg-red-500'
+                  }`} />
+                  <span className="text-[13px] text-gray-700 dark:text-gray-300 capitalize">{connectionState}</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] text-gray-500 dark:text-gray-400">Port</span>
+                <span className="text-[13px] text-gray-700 dark:text-gray-300 font-mono">3000</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <span className="text-[11px] text-gray-400 dark:text-gray-500 font-mono">
+            LilClaw v{appVersion}
+          </span>
           <button
             onClick={() => setShowSettings(false)}
-            className="w-full py-2.5 rounded-xl text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors touch-target"
+            className="py-2 px-4 rounded-xl text-sm font-medium text-gray-500 dark:text-gray-400 active:bg-gray-50 dark:active:bg-gray-800 transition-colors"
           >
             Done
           </button>
