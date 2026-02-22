@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import MessageBubble from './MessageBubble'
 import ActionCards from './ActionCards'
 import type { ActionCard } from '../lib/actions'
+import { haptic } from '../lib/haptic'
 
 function ConnectionBanner() {
   const { connectionState, cacheLoaded, pendingMessages } = useStore()
@@ -249,6 +250,7 @@ export default function ChatScreen() {
     }
 
     sendMessage(finalMessage)
+    haptic('light')
   }, [input, sendMessage, activeAction])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
