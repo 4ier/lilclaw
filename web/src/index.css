@@ -41,7 +41,6 @@
     @apply px-3.5 py-2.5;
     border-radius: 18px;
     max-width: 88%;
-    width: fit-content;
   }
 
   .message-bubble-user {
@@ -126,8 +125,10 @@
 
 /* Horizontal rule */
 .prose-chat hr {
-  @apply border-gray-200 dark:border-gray-600;
+  @apply border-gray-200 dark:border-gray-700;
   margin: 0.75rem 0;
+  border-width: 0;
+  border-top-width: 1px;
 }
 
 /* Links */
@@ -166,7 +167,7 @@
 
 /* Code blocks */
 .prose-chat pre {
-  margin: 0.5rem -0.5rem;
+  margin: 0.5rem 0;
   border-radius: 10px;
   overflow-x: auto;
   font-size: 0.8rem;
@@ -383,4 +384,13 @@
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-gray-400 dark:bg-gray-500;
+}
+
+/* Code block scrollbar — thinner */
+.prose-chat pre::-webkit-scrollbar {
+  height: 3px;
+}
+
+.prose-chat pre::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 dark:bg-gray-600 rounded-full;
 }
