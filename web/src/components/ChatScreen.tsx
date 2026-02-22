@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react'
 import { useStore } from '../store'
 import MessageBubble from './MessageBubble'
 import ActionCards from './ActionCards'
+import VoiceButton from './VoiceButton'
 import type { ActionCard } from '../lib/actions'
 import { haptic } from '../lib/haptic'
 import { formatDateSeparator, isDifferentDay } from '../lib/dateSeparator'
@@ -202,6 +203,21 @@ export default function ChatScreen() {
     textareaRef.current?.focus()
   }, [])
 
+  // Handle image picked from native bridge
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).__lilclaw_onImagePicked = (dataUrl: string) => {
+      // Send as message with image attachment
+      // For now, just send the data URL as a message prefix
+      sendMessage(`[图片]\n${dataUrl}`)
+    };
+    (window as unknown as Record<string, unknown>).__lilclaw_onError = (error: string) => {
+      import('./Toast').then(m => m.showToast(error, 'error'))
+    }
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__lilclaw_onImagePicked
+      delete (window as unknown as Record<string, unknown>).__lilclaw_onError
+    }
+  }, [sendMessage])
   // Auto-grow textarea
   const adjustTextareaHeight = useCallback(() => {
     const el = textareaRef.current
@@ -472,18 +488,22 @@ export default function ChatScreen() {
                 <rect x="6" y="6" width="12" height="12" rx="2" />
               </svg>
             </button>
-          ) : (
+          ) : input.trim() ? (
             <button
               type="submit"
-              disabled={!input.trim()}
               onMouseDown={(e) => e.preventDefault()}
-              className="flex items-center justify-center p-2.5 rounded-full bg-amber-800 text-white disabled:opacity-30 active:bg-amber-950 active:scale-95 transition-all"
+              className="flex items-center justify-center p-2.5 rounded-full bg-amber-800 text-white active:bg-amber-950 active:scale-95 transition-all"
               aria-label="Send message"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
             </button>
+          ) : (
+            <VoiceButton onResult={(text) => {
+              setInput(text)
+              haptic('medium')
+            }} />
           )}
         </div>
       </form>
