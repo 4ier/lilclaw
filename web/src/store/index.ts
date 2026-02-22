@@ -295,11 +295,25 @@ export const useStore = create<AppState>()(
 
 // Initialize theme on load + listen for system theme changes
 if (typeof window !== 'undefined') {
-  // Check URL param from Android WebView for initial system dark state
-  const urlParams = new URLSearchParams(window.location.search)
-  const darkParam = urlParams.get('dark')
-  if (darkParam !== null) {
-    ;(window as any).__SYSTEM_DARK = darkParam === '1'
+  // Determine system dark state from multiple sources (in priority order):
+  // 1. Native Android bridge (synchronous, most reliable)
+  // 2. URL param from Android WebView
+  // 3. CSS media query (works in browser, unreliable in WebView)
+  let systemDark: boolean | undefined
+  try {
+    systemDark = (window as any).LilClaw?.isSystemDarkMode?.()
+  } catch { /* bridge not available */ }
+
+  if (systemDark === undefined) {
+    const urlParams = new URLSearchParams(window.location.search)
+    const darkParam = urlParams.get('dark')
+    if (darkParam !== null) {
+      systemDark = darkParam === '1'
+    }
+  }
+
+  if (systemDark !== undefined) {
+    ;(window as any).__SYSTEM_DARK = systemDark
   }
 
   const applyTheme = (theme: string) => {

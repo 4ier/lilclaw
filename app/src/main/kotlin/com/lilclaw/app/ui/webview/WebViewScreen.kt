@@ -69,7 +69,8 @@ fun WebViewScreen(
     }
 
     // Notify the SPA when the system dark mode changes so "System" theme works.
-    LaunchedEffect(isSystemDark) {
+    // Key on both webView (to run once webView is ready) and isSystemDark (to react to changes).
+    LaunchedEffect(webView, isSystemDark) {
         webView?.evaluateJavascript(
             "window.__SYSTEM_DARK=${isSystemDark};window.dispatchEvent(new CustomEvent('systemthemechange',{detail:{dark:${isSystemDark}}}))",
             null
@@ -138,9 +139,26 @@ fun WebViewScreen(
                     fun openSettings() {
                         post { onSettingsClick() }
                     }
+
+                    @JavascriptInterface
+                    fun isSystemDarkMode(): Boolean {
+                        return (context.resources.configuration.uiMode
+                            and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                            android.content.res.Configuration.UI_MODE_NIGHT_YES
+                    }
                 }, "LilClaw")
 
                 webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        super.onPageFinished(view, url)
+                        // Inject system dark state + app version after page has fully loaded
+                        val appVersion = com.lilclaw.app.BuildConfig.VERSION_NAME
+                        view?.evaluateJavascript(
+                            "window.__LILCLAW_VERSION='$appVersion';window.__SYSTEM_DARK=$isDark;window.dispatchEvent(new CustomEvent('systemthemechange',{detail:{dark:$isDark}}))",
+                            null
+                        )
+                    }
+
                     override fun onReceivedError(
                         view: WebView?,
                         request: WebResourceRequest?,
@@ -164,10 +182,6 @@ fun WebViewScreen(
                 // Set initial --kb-height before page loads
                 clearCache(true)
                 loadUrl(buildUrl(isDark))
-
-                // Inject app version into WebView globals after page loads
-                val appVersion = com.lilclaw.app.BuildConfig.VERSION_NAME
-                evaluateJavascript("window.__LILCLAW_VERSION='$appVersion'", null)
 
                 webView = this
             }
