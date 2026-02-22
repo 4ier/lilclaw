@@ -8,6 +8,7 @@ import {
   type AgentEvent,
   type SessionInfo,
 } from '../lib/gateway'
+import { saveMessages, loadAllMessages, deleteSessionMessages } from '../lib/messageDb'
 
 interface StreamingContent {
   content: MessageContent[]
@@ -36,6 +37,7 @@ interface AppState {
   showDrawer: boolean
   showSettings: boolean
   theme: 'system' | 'light' | 'dark'
+  cacheLoaded: boolean
 
   // Client
   client: GatewayClient | null
@@ -50,6 +52,10 @@ interface AppState {
   loadHistory: () => Promise<void>
   loadSessions: () => Promise<void>
   renameSession: (key: string, label: string) => Promise<void>
+  deleteMessage: (sessionKey: string, index: number) => void
+  retryLastMessage: () => void
+  deleteSession: (sessionKey: string) => void
+  loadCachedMessages: () => Promise<void>
 
   setShowDrawer: (show: boolean) => void
   setShowSettings: (show: boolean) => void
@@ -58,6 +64,18 @@ interface AppState {
 
   // Helpers
   getSessionDisplayName: (key: string) => string
+  isGenerating: (sessionKey?: string) => boolean
+}
+
+// Persist messages to IndexedDB (debounced)
+const persistTimers = new Map<string, ReturnType<typeof setTimeout>>()
+function debouncedPersist(sessionKey: string, messages: ChatMessage[]) {
+  const existing = persistTimers.get(sessionKey)
+  if (existing) clearTimeout(existing)
+  persistTimers.set(sessionKey, setTimeout(() => {
+    saveMessages(sessionKey, messages)
+    persistTimers.delete(sessionKey)
+  }, 500))
 }
 
 export const useStore = create<AppState>()(
@@ -65,8 +83,6 @@ export const useStore = create<AppState>()(
     (set, get) => {
       let client: GatewayClient | null = null
 
-      // Gateway uses internal session keys like "agent:dev:main" or "agent:<id>:<key>"
-      // Normalize to the user-facing key (strip "agent:<id>:" prefix)
       const normalizeSessionKey = (key: string): string => {
         const match = key.match(/^agent:[^:]+:(.+)$/)
         return match ? match[1] : key
@@ -94,25 +110,21 @@ export const useStore = create<AppState>()(
                   },
                 }))
               } else {
-                // Final message - add to messages and clear streaming
+                // Final message
                 set((state) => {
                   const existingMessages = state.messages[sessionKey] || []
+                  const newMessages = [
+                    ...existingMessages,
+                    { role: 'assistant' as const, content, timestamp: Date.now() },
+                  ]
+                  debouncedPersist(sessionKey, newMessages)
                   return {
-                    messages: {
-                      ...state.messages,
-                      [sessionKey]: [
-                        ...existingMessages,
-                        { role: 'assistant', content, timestamp: Date.now() },
-                      ],
-                    },
+                    messages: { ...state.messages, [sessionKey]: newMessages },
                     streaming: {
                       ...state.streaming,
                       [sessionKey]: { content: [], isStreaming: false },
                     },
-                    agentState: {
-                      ...state.agentState,
-                      [sessionKey]: null,
-                    },
+                    agentState: { ...state.agentState, [sessionKey]: null },
                     typing: { ...state.typing, [sessionKey]: false },
                   }
                 })
@@ -121,20 +133,15 @@ export const useStore = create<AppState>()(
             onAgentEvent: (rawSessionKey, event) => {
               const sessionKey = normalizeSessionKey(rawSessionKey)
               set((state) => ({
-                agentState: {
-                  ...state.agentState,
-                  [sessionKey]: event,
-                },
-                // Any agent event means we're past the "waiting" phase
+                agentState: { ...state.agentState, [sessionKey]: event },
                 typing: { ...state.typing, [sessionKey]: false },
               }))
             },
             onHistoryLoaded: (sessionKey, messages) => {
+              // Server history replaces cached messages
+              debouncedPersist(sessionKey, messages)
               set((state) => ({
-                messages: {
-                  ...state.messages,
-                  [sessionKey]: messages,
-                },
+                messages: { ...state.messages, [sessionKey]: messages },
               }))
             },
             onSessionsLoaded: (sessions) => {
@@ -164,13 +171,30 @@ export const useStore = create<AppState>()(
         showDrawer: false,
         showSettings: false,
         theme: 'system',
+        cacheLoaded: false,
         client: null,
 
-        // Actions
-        connect: () => {
-          if (!client) {
-            initClient()
+        // Load cached messages from IndexedDB (call on app init)
+        loadCachedMessages: async () => {
+          const cached = await loadAllMessages()
+          if (Object.keys(cached).length > 0) {
+            set((state) => {
+              // Only set cached messages for sessions that don't already have server data
+              const merged = { ...cached }
+              for (const key of Object.keys(state.messages)) {
+                if (state.messages[key].length > 0) {
+                  merged[key] = state.messages[key]
+                }
+              }
+              return { messages: merged, cacheLoaded: true }
+            })
+          } else {
+            set({ cacheLoaded: true })
           }
+        },
+
+        connect: () => {
+          if (!client) initClient()
           client?.connect()
         },
 
@@ -181,34 +205,32 @@ export const useStore = create<AppState>()(
         sendMessage: async (message: string) => {
           const { currentSessionKey } = get()
 
-          // Add user message immediately
           const userMessage: ChatMessage = {
             role: 'user',
             content: [{ type: 'text', text: message }],
             timestamp: Date.now(),
           }
 
-          set((state) => ({
-            messages: {
-              ...state.messages,
-              [currentSessionKey]: [
-                ...(state.messages[currentSessionKey] || []),
-                userMessage,
-              ],
-            },
-            // Show typing indicator immediately
-            typing: { ...state.typing, [currentSessionKey]: true },
-          }))
+          set((state) => {
+            const newMessages = [
+              ...(state.messages[currentSessionKey] || []),
+              userMessage,
+            ]
+            debouncedPersist(currentSessionKey, newMessages)
+            return {
+              messages: { ...state.messages, [currentSessionKey]: newMessages },
+              typing: { ...state.typing, [currentSessionKey]: true },
+            }
+          })
 
           await client?.sendMessage(currentSessionKey, message)
 
-          // Auto-name session: if this is the first user message and session has no label
+          // Auto-name session
           const state = get()
           const sessionMessages = state.messages[currentSessionKey] || []
           const userMessages = sessionMessages.filter((m) => m.role === 'user')
           const sessionInfo = state.sessions.find((s) => s.key === currentSessionKey)
           if (userMessages.length === 1 && !sessionInfo?.label) {
-            // Take first 30 chars of the message as label
             const label = message.length > 30 ? message.slice(0, 30) + '…' : message
             client?.patchSession(currentSessionKey, { label }).then(() => {
               get().loadSessions()
@@ -219,6 +241,14 @@ export const useStore = create<AppState>()(
         abortChat: async () => {
           const { currentSessionKey } = get()
           await client?.abortChat(currentSessionKey)
+          set((state) => ({
+            streaming: {
+              ...state.streaming,
+              [currentSessionKey]: { content: [], isStreaming: false },
+            },
+            typing: { ...state.typing, [currentSessionKey]: false },
+            agentState: { ...state.agentState, [currentSessionKey]: null },
+          }))
         },
 
         switchSession: (sessionKey: string) => {
@@ -246,6 +276,59 @@ export const useStore = create<AppState>()(
         renameSession: async (key: string, label: string) => {
           await client?.patchSession(key, { label })
           await get().loadSessions()
+        },
+
+        deleteMessage: (sessionKey: string, index: number) => {
+          set((state) => {
+            const msgs = [...(state.messages[sessionKey] || [])]
+            msgs.splice(index, 1)
+            debouncedPersist(sessionKey, msgs)
+            return { messages: { ...state.messages, [sessionKey]: msgs } }
+          })
+        },
+
+        retryLastMessage: () => {
+          const { currentSessionKey, messages } = get()
+          const msgs = messages[currentSessionKey] || []
+
+          // Find last user message
+          let lastUserIdx = -1
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].role === 'user') { lastUserIdx = i; break }
+          }
+          if (lastUserIdx === -1) return
+
+          const lastUserMsg = msgs[lastUserIdx]
+          const text = lastUserMsg.content
+            .filter((c) => c.type === 'text' && c.text)
+            .map((c) => c.text)
+            .join('\n')
+
+          if (!text) return
+
+          // Remove messages after (and including) the last user message, then re-send
+          const trimmed = msgs.slice(0, lastUserIdx)
+          set((state) => ({
+            messages: { ...state.messages, [currentSessionKey]: trimmed },
+          }))
+
+          // Re-send
+          get().sendMessage(text)
+        },
+
+        deleteSession: (sessionKey: string) => {
+          deleteSessionMessages(sessionKey)
+          set((state) => {
+            const newMessages = { ...state.messages }
+            delete newMessages[sessionKey]
+            const newSessions = state.sessions.filter((s) => s.key !== sessionKey)
+            const needSwitch = state.currentSessionKey === sessionKey
+            return {
+              messages: newMessages,
+              sessions: newSessions,
+              currentSessionKey: needSwitch ? (newSessions[0]?.key || 'main') : state.currentSessionKey,
+            }
+          })
         },
 
         setShowDrawer: (show: boolean) => set({ showDrawer: show }),
@@ -278,6 +361,12 @@ export const useStore = create<AppState>()(
           if (raw === 'main') return 'LilClaw'
           if (/^chat-\d+$/.test(raw)) return 'New Chat'
           return raw
+        },
+
+        isGenerating: (sessionKey?: string) => {
+          const key = sessionKey || get().currentSessionKey
+          const state = get()
+          return !!(state.typing[key] || state.streaming[key]?.isStreaming)
         },
       }
     },
@@ -336,7 +425,7 @@ if (typeof window !== 'undefined') {
       const { state } = JSON.parse(stored)
       initialTheme = state?.theme || 'system'
     } catch {
-      // Ignore parse errors
+      // Ignore
     }
   }
   applyTheme(initialTheme)

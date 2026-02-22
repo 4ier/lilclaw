@@ -1,5 +1,137 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { useStore } from '../store'
+
+function SessionItem({
+  session,
+  isActive,
+  displayName,
+  onSwitch,
+  onDelete,
+}: {
+  session: { key: string; label?: string }
+  isActive: boolean
+  displayName: string
+  onSwitch: () => void
+  onDelete: () => void
+}) {
+  const [swipeX, setSwipeX] = useState(0)
+  const [showDelete, setShowDelete] = useState(false)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  const swipingRef = useRef(false)
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+    swipingRef.current = false
+  }, [])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return
+    const touch = e.touches[0]
+    const dx = touch.clientX - touchStartRef.current.x
+    const dy = Math.abs(touch.clientY - touchStartRef.current.y)
+
+    // If vertical scroll, don't swipe
+    if (dy > 20 && !swipingRef.current) {
+      touchStartRef.current = null
+      return
+    }
+
+    if (dx < -10) swipingRef.current = true
+
+    if (swipingRef.current) {
+      setSwipeX(Math.min(0, Math.max(-80, dx)))
+    }
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    if (swipeX < -40) {
+      setShowDelete(true)
+      setSwipeX(-80)
+    } else {
+      setShowDelete(false)
+      setSwipeX(0)
+    }
+    touchStartRef.current = null
+    swipingRef.current = false
+  }, [swipeX])
+
+  const handleDelete = useCallback(() => {
+    setSwipeX(0)
+    setShowDelete(false)
+    onDelete()
+  }, [onDelete])
+
+  const handleClick = useCallback(() => {
+    if (!swipingRef.current && swipeX === 0) {
+      onSwitch()
+    }
+  }, [onSwitch, swipeX])
+
+  // Reset swipe when drawer closes
+  useEffect(() => {
+    return () => {
+      setSwipeX(0)
+      setShowDelete(false)
+    }
+  }, [])
+
+  return (
+    <div className="relative overflow-hidden">
+      {/* Delete button behind */}
+      {showDelete && (
+        <button
+          onClick={handleDelete}
+          className="absolute right-0 top-0 bottom-0 w-20 flex items-center justify-center bg-red-500 text-white text-sm font-medium"
+        >
+          Delete
+        </button>
+      )}
+
+      {/* Session row */}
+      <div
+        onClick={handleClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className={`w-full px-4 py-3 text-left flex items-center gap-3 bg-white dark:bg-[#141414] ${
+          isActive
+            ? 'bg-amber-50 dark:!bg-amber-500/10'
+            : 'active:bg-gray-100 dark:active:bg-white/[0.08]'
+        }`}
+        style={{
+          transform: `translate3d(${swipeX}px, 0, 0)`,
+          transition: swipingRef.current ? 'none' : 'transform 200ms ease-out',
+        }}
+      >
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-semibold ${
+          isActive
+            ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-500'
+            : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+        }`}>
+          {displayName.charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className={`text-[14px] truncate ${
+            isActive
+              ? 'text-amber-800 dark:text-amber-500 font-medium'
+              : 'text-gray-900 dark:text-gray-100'
+          }`}>
+            {displayName}
+          </div>
+          {session.label && session.key !== (session.label || session.key) && (
+            <div className="text-[11px] text-gray-400 dark:text-gray-500 truncate">
+              {session.key.replace(/^agent:[^:]+:/, '')}
+            </div>
+          )}
+        </div>
+        {isActive && (
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function SessionDrawer() {
   const {
@@ -8,15 +140,14 @@ export default function SessionDrawer() {
     currentSessionKey,
     switchSession,
     createSession,
+    deleteSession,
     setShowDrawer,
     getSessionDisplayName,
   } = useStore()
 
   const drawerRef = useRef<HTMLDivElement>(null)
-
   const close = useCallback(() => setShowDrawer(false), [setShowDrawer])
 
-  // Close on click outside drawer panel
   useEffect(() => {
     if (!showDrawer) return
     const handleClickOutside = (e: TouchEvent | MouseEvent) => {
@@ -24,7 +155,6 @@ export default function SessionDrawer() {
         close()
       }
     }
-    // Use touchend to avoid ghost clicks on mobile
     document.addEventListener('touchend', handleClickOutside, { passive: true })
     document.addEventListener('mousedown', handleClickOutside)
     return () => {
@@ -33,7 +163,6 @@ export default function SessionDrawer() {
     }
   }, [showDrawer, close])
 
-  // Close on escape
   useEffect(() => {
     if (!showDrawer) return
     const handleEscape = (e: KeyboardEvent) => {
@@ -43,7 +172,6 @@ export default function SessionDrawer() {
     return () => document.removeEventListener('keydown', handleEscape)
   }, [showDrawer, close])
 
-  // If sessions list is empty, show at least current
   const displaySessions = sessions.length > 0
     ? sessions
     : [{ key: currentSessionKey }]
@@ -54,10 +182,8 @@ export default function SessionDrawer() {
       style={{
         pointerEvents: showDrawer ? 'auto' : 'none',
         visibility: showDrawer ? 'visible' : 'hidden',
-        // Keep in DOM but hidden — avoids mount/unmount cost
       }}
     >
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40"
         style={{
@@ -66,7 +192,6 @@ export default function SessionDrawer() {
         }}
       />
 
-      {/* Drawer panel */}
       <div
         ref={drawerRef}
         className="relative w-72 max-w-[85vw] h-full bg-white dark:bg-[#141414] shadow-2xl flex flex-col"
@@ -75,7 +200,6 @@ export default function SessionDrawer() {
           transition: 'transform 180ms ease-out',
         }}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 safe-top">
           <h2 className="text-[17px] font-semibold text-gray-900 dark:text-white">
             Sessions
@@ -91,52 +215,22 @@ export default function SessionDrawer() {
           </button>
         </div>
 
-        {/* Session list */}
         <div className="flex-1 overflow-y-auto py-1">
           {displaySessions.map((session) => {
             const isActive = session.key === currentSessionKey
-            const displayName = getSessionDisplayName(session.key)
-
             return (
-              <button
+              <SessionItem
                 key={session.key}
-                onClick={() => { switchSession(session.key); close() }}
-                className={`w-full px-4 py-3 text-left flex items-center gap-3 ${
-                  isActive
-                    ? 'bg-amber-50 dark:bg-amber-500/10'
-                    : 'active:bg-gray-100 dark:active:bg-white/[0.08]'
-                }`}
-              >
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-semibold ${
-                  isActive
-                    ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-500'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
-                }`}>
-                  {displayName.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className={`text-[14px] truncate ${
-                    isActive
-                      ? 'text-amber-800 dark:text-amber-500 font-medium'
-                      : 'text-gray-900 dark:text-gray-100'
-                  }`}>
-                    {displayName}
-                  </div>
-                  {session.label && session.key !== (session.label || session.key) && (
-                    <div className="text-[11px] text-gray-400 dark:text-gray-500 truncate">
-                      {session.key.replace(/^agent:[^:]+:/, '')}
-                    </div>
-                  )}
-                </div>
-                {isActive && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
-                )}
-              </button>
+                session={session}
+                isActive={isActive}
+                displayName={getSessionDisplayName(session.key)}
+                onSwitch={() => { switchSession(session.key); close() }}
+                onDelete={() => deleteSession(session.key)}
+              />
             )
           })}
         </div>
 
-        {/* New session */}
         <div className="border-t border-gray-100 dark:border-gray-800 p-3 safe-bottom">
           <button
             onClick={() => {

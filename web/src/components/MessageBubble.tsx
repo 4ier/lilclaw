@@ -1,14 +1,23 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import rehypeRaw from 'rehype-raw'
 import type { MessageContent } from '../lib/gateway'
+import { formatRelativeTime } from '../lib/formatTime'
+import { useStore } from '../store'
+import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant'
   content: MessageContent[]
+  timestamp?: number
   isStreaming?: boolean
+  index: number
+  sessionKey: string
+  animate?: boolean
+  showRetry?: boolean
+  onRetry?: () => void
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -34,9 +43,7 @@ function HtmlSandbox({ html }: { html: string }) {
   const [height, setHeight] = useState(200)
 
   const srcDoc = useMemo(() => {
-    // If it's a full HTML document, use as-is
     if (html.trim().startsWith('<!DOCTYPE') || html.trim().startsWith('<html')) {
-      // Inject resize observer script
       return html.replace('</body>', `
         <script>
           const ro = new ResizeObserver(() => {
@@ -47,7 +54,6 @@ function HtmlSandbox({ html }: { html: string }) {
         </script>
       </body>`)
     }
-    // Fragment — wrap in a full document
     return `<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
@@ -67,7 +73,6 @@ function HtmlSandbox({ html }: { html: string }) {
 </body></html>`
   }, [html])
 
-  // Listen for resize messages from iframe
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       if (e.data?.type === 'iframe-resize' && typeof e.data.height === 'number') {
@@ -112,16 +117,10 @@ function extractText(node: React.ReactNode): string {
 function CodeBlock({ className, children }: { className?: string; children: React.ReactNode }) {
   const code = extractText(children).replace(/\n$/, '')
   const language = (className || '').replace('language-', '').replace('hljs ', '').trim()
-
-  // Detect HTML code blocks that should be rendered
   const isHtmlRender = language === 'html' && code.includes('<')
 
   if (isHtmlRender && code.length > 100) {
-    return (
-      <div className="my-2">
-        <HtmlSandbox html={code} />
-      </div>
-    )
+    return <div className="my-2"><HtmlSandbox html={code} /></div>
   }
 
   return (
@@ -139,8 +138,24 @@ function CodeBlock({ className, children }: { className?: string; children: Reac
   )
 }
 
-export default function MessageBubble({ role, content, isStreaming }: MessageBubbleProps) {
+export default function MessageBubble({
+  role,
+  content,
+  timestamp,
+  isStreaming,
+  index,
+  sessionKey,
+  animate,
+  showRetry,
+  onRetry,
+}: MessageBubbleProps) {
   const isUser = role === 'user'
+  const [showTimestamp, setShowTimestamp] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  const bubbleRef = useRef<HTMLDivElement>(null)
+  const deleteMessage = useStore((s) => s.deleteMessage)
 
   const textContent = content
     .filter((c) => c.type === 'text' && c.text)
@@ -149,49 +164,150 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
 
   const images = content.filter((c) => c.type === 'image' && c.url)
 
-  return (
-    <div
-      className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
-    >
-      <div
-        className={`message-bubble ${
-          isUser ? 'message-bubble-user' : 'message-bubble-assistant'
-        }`}
-      >
-        {images.map((img, i) => (
-          <img
-            key={i}
-            src={img.url}
-            alt="Content"
-            className="max-w-full rounded-lg mb-2"
-          />
-        ))}
+  // Long-press detection
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+    longPressTimerRef.current = setTimeout(() => {
+      setContextMenu({ x: touch.clientX, y: touch.clientY })
+    }, 500)
+  }, [])
 
-        <div className={`prose-chat ${isStreaming ? 'cursor-blink' : ''}`}>
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight, rehypeRaw]}
-            components={{
-              code({ className, children, ...props }) {
-                const isInline = !className
-                if (isInline) {
-                  return <code {...props}>{children}</code>
-                }
-                return <CodeBlock className={className}>{children}</CodeBlock>
-              },
-              table({ children }) {
-                return (
-                  <div className="table-wrapper">
-                    <table>{children}</table>
-                  </div>
-                )
-              },
-            }}
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return
+    const touch = e.touches[0]
+    const dx = Math.abs(touch.clientX - touchStartRef.current.x)
+    const dy = Math.abs(touch.clientY - touchStartRef.current.y)
+    if (dx > 10 || dy > 10) {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+    }
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+  }, [])
+
+  // Right-click context menu (desktop)
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY })
+  }, [])
+
+  // Tap to toggle timestamp
+  const handleTap = useCallback(() => {
+    if (!contextMenu) {
+      setShowTimestamp((prev) => !prev)
+    }
+  }, [contextMenu])
+
+  // Build context menu items
+  const menuItems: ContextMenuItem[] = useMemo(() => {
+    const items: ContextMenuItem[] = [
+      {
+        label: 'Copy',
+        icon: '📋',
+        onClick: () => navigator.clipboard.writeText(textContent),
+      },
+    ]
+    if (!isUser && showRetry && onRetry) {
+      items.push({
+        label: 'Retry',
+        icon: '↻',
+        onClick: onRetry,
+      })
+    }
+    if (index >= 0) {
+      items.push({
+        label: 'Delete',
+        icon: '🗑',
+        onClick: () => deleteMessage(sessionKey, index),
+        danger: true,
+      })
+    }
+    return items
+  }, [textContent, isUser, showRetry, onRetry, index, sessionKey, deleteMessage])
+
+  return (
+    <>
+      <div
+        className={`flex ${isUser ? 'justify-end' : 'justify-start'} ${animate ? 'animate-message-in' : ''}`}
+      >
+        <div className="flex flex-col max-w-[88%]">
+          <div
+            ref={bubbleRef}
+            className={`message-bubble ${isUser ? 'message-bubble-user' : 'message-bubble-assistant'}`}
+            onClick={handleTap}
+            onContextMenu={handleContextMenu}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           >
-            {textContent}
-          </ReactMarkdown>
+            {images.map((img, i) => (
+              <img
+                key={i}
+                src={img.url}
+                alt="Content"
+                className="max-w-full rounded-lg mb-2"
+              />
+            ))}
+
+            <div className={`prose-chat ${isStreaming ? 'cursor-blink' : ''}`}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                components={{
+                  code({ className, children, ...props }) {
+                    const isInline = !className
+                    if (isInline) {
+                      return <code {...props}>{children}</code>
+                    }
+                    return <CodeBlock className={className}>{children}</CodeBlock>
+                  },
+                  table({ children }) {
+                    return (
+                      <div className="table-wrapper">
+                        <table>{children}</table>
+                      </div>
+                    )
+                  },
+                }}
+              >
+                {textContent}
+              </ReactMarkdown>
+            </div>
+          </div>
+
+          {/* Timestamp */}
+          {showTimestamp && timestamp && (
+            <div className={`text-[11px] text-gray-400 dark:text-gray-500 mt-1 ${isUser ? 'text-right pr-1' : 'pl-1'}`}>
+              {formatRelativeTime(timestamp)}
+            </div>
+          )}
+
+          {/* Retry button */}
+          {showRetry && onRetry && (
+            <button
+              onClick={onRetry}
+              className="flex items-center gap-1 mt-1 pl-1 text-[12px] text-gray-400 dark:text-gray-500 hover:text-amber-700 dark:hover:text-amber-500 transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>Retry</span>
+            </button>
+          )}
         </div>
       </div>
-    </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <ContextMenu
+          items={menuItems}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+    </>
   )
 }
