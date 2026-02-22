@@ -75,9 +75,13 @@ export default function ChatScreen() {
   const isTyping = typing[currentSessionKey] || false
   const displayName = getSessionDisplayName(currentSessionKey)
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages / streaming updates.
+  // Uses 'instant' during streaming to avoid jitter from competing smooth scrolls.
+  // Only auto-scrolls if user was already near the bottom (not scrolled up to read history).
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (!wasAtBottomRef.current) return
+    const isStreaming = currentStreaming?.isStreaming
+    messagesEndRef.current?.scrollIntoView({ behavior: isStreaming ? 'instant' : 'smooth' })
   }, [currentMessages, currentStreaming, isTyping])
 
   // Scroll to bottom when container resizes (e.g. keyboard open/close).
