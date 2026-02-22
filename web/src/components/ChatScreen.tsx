@@ -2,53 +2,104 @@ import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react'
 import { useStore } from '../store'
 import MessageBubble from './MessageBubble'
 
-function ConnectionIndicator() {
-  const { connectionState } = useStore()
+function ConnectionBanner() {
+  const { connectionState, cacheLoaded } = useStore()
 
-  if (connectionState === 'connected') {
-    return (
-      <div className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-      </div>
-    )
+  if (connectionState === 'connected') return null
+
+  const config: Record<string, { color: string; bg: string; label: string }> = {
+    connecting: {
+      color: 'text-amber-700 dark:text-amber-400',
+      bg: 'bg-amber-50 dark:bg-amber-900/20',
+      label: cacheLoaded ? 'Connecting to gateway...' : 'Loading...',
+    },
+    disconnected: {
+      color: 'text-gray-500 dark:text-gray-400',
+      bg: 'bg-gray-50 dark:bg-gray-800',
+      label: 'Gateway offline',
+    },
+    error: {
+      color: 'text-red-600 dark:text-red-400',
+      bg: 'bg-red-50 dark:bg-red-900/20',
+      label: 'Connection error — retrying...',
+    },
   }
 
-  const config: Record<string, { color: string; label: string }> = {
-    connecting: { color: 'bg-amber-500 animate-pulse', label: 'Connecting...' },
-    disconnected: { color: 'bg-gray-400', label: 'Offline' },
-    error: { color: 'bg-red-500', label: 'Error' },
-  }
-
-  const { color, label } = config[connectionState] || config.disconnected
+  const { color, bg, label } = config[connectionState] || config.disconnected
 
   return (
-    <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
-      <span className={`w-1.5 h-1.5 rounded-full ${color}`} />
+    <div className={`flex items-center justify-center gap-2 px-4 py-1.5 text-[12px] ${color} ${bg} flex-shrink-0`}>
+      {connectionState === 'connecting' && (
+        <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+      )}
       <span>{label}</span>
     </div>
   )
 }
 
+function ConnectionDot() {
+  const { connectionState } = useStore()
+  if (connectionState === 'connected') {
+    return <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+  }
+  const colors: Record<string, string> = {
+    connecting: 'bg-amber-500 animate-pulse',
+    disconnected: 'bg-gray-400',
+    error: 'bg-red-500',
+  }
+  return <span className={`w-1.5 h-1.5 rounded-full ${colors[connectionState] || 'bg-gray-400'}`} />
+}
+
+const TOOL_DISPLAY: Record<string, { icon: string; label: string }> = {
+  exec: { icon: '💻', label: 'Running command...' },
+  web_search: { icon: '🔍', label: 'Searching web...' },
+  web_fetch: { icon: '🌐', label: 'Fetching page...' },
+  browser: { icon: '🌐', label: 'Using browser...' },
+  read: { icon: '📄', label: 'Reading file...' },
+  write: { icon: '📝', label: 'Writing file...' },
+  edit: { icon: '✏️', label: 'Editing file...' },
+  memory_search: { icon: '🧠', label: 'Searching memory...' },
+  message: { icon: '💬', label: 'Sending message...' },
+  tts: { icon: '🔊', label: 'Generating speech...' },
+}
+
 function AgentStatus() {
   const { agentState, currentSessionKey } = useStore()
   const state = agentState[currentSessionKey]
-  if (!state) return null
+  if (!state || state.kind === 'done') return null
 
-  const labels: Record<string, string> = {
-    thinking: 'Thinking...',
-    tool_use: 'Using tools...',
-    done: '',
-    error: 'Error occurred',
+  // Extract tool name from event data
+  const data = state.data as Record<string, unknown> | undefined
+  const toolName = (data?.tool || data?.name || '') as string
+
+  let icon = '⚙️'
+  let label = 'Thinking...'
+
+  if (state.kind === 'tool_use') {
+    const display = TOOL_DISPLAY[toolName]
+    if (display) {
+      icon = display.icon
+      label = display.label
+    } else if (toolName) {
+      label = `Using ${toolName}...`
+    } else {
+      label = 'Using tools...'
+    }
+  } else if (state.kind === 'thinking') {
+    icon = '💭'
+    label = 'Thinking...'
+  } else if (state.kind === 'error') {
+    icon = '⚠️'
+    label = 'Error occurred'
   }
-  if (!labels[state.kind]) return null
 
   return (
-    <div className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800">
-      <svg className="w-4 h-4 animate-spin text-amber-700 dark:text-amber-500" viewBox="0 0 24 24" fill="none">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-      </svg>
-      <span>{labels[state.kind]}</span>
+    <div className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50/80 dark:bg-[#231c14]/80 flex-shrink-0 animate-fade-in">
+      <span className="text-base animate-pulse">{icon}</span>
+      <span>{label}</span>
     </div>
   )
 }
@@ -61,44 +112,44 @@ export default function ChatScreen() {
     currentSessionKey,
     connectionState,
     sendMessage,
+    abortChat,
+    retryLastMessage,
     setShowDrawer,
     setShowSettings,
     getSessionDisplayName,
+    isGenerating,
   } = useStore()
 
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const wasAtBottomRef = useRef(true)
+  const prevMessageCountRef = useRef(0)
 
   const currentMessages = messages[currentSessionKey] || []
   const currentStreaming = streaming[currentSessionKey]
   const isTyping = typing[currentSessionKey] || false
   const displayName = getSessionDisplayName(currentSessionKey)
+  const generating = isGenerating()
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [currentMessages, currentStreaming, isTyping])
+    if (wasAtBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [currentMessages.length, currentStreaming?.content, isTyping])
 
-  // Scroll to bottom when container resizes (e.g. keyboard open/close).
-  // Uses ResizeObserver on the messages container — works regardless of
-  // whether the resize comes from Kotlin insets or CSS changes.
-  const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const wasAtBottomRef = useRef(true)
+  // Track new messages for animation
+  useEffect(() => {
+    prevMessageCountRef.current = currentMessages.length
+  }, [currentMessages.length])
 
-  // Track whether user is scrolled to bottom
-  const handleScroll = useCallback(() => {
-    const el = messagesContainerRef.current
-    if (!el) return
-    const threshold = 60 // px from bottom to consider "at bottom"
-    wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
-  }, [])
-
+  // Scroll on container resize (keyboard open/close)
   useEffect(() => {
     const container = messagesContainerRef.current
     if (!container) return
     const ro = new ResizeObserver(() => {
-      // Only auto-scroll if user was at the bottom before resize
       if (wasAtBottomRef.current) {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
       }
@@ -107,16 +158,36 @@ export default function ChatScreen() {
     return () => ro.disconnect()
   }, [])
 
+  const handleScroll = useCallback(() => {
+    const el = messagesContainerRef.current
+    if (!el) return
+    wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+  }, [])
+
   // Focus input on mount
   useEffect(() => {
-    inputRef.current?.focus()
+    textareaRef.current?.focus()
   }, [])
+
+  // Auto-grow textarea
+  const adjustTextareaHeight = useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+  }, [])
+
+  useEffect(() => {
+    adjustTextareaHeight()
+  }, [input, adjustTextareaHeight])
 
   const handleSubmit = useCallback((e: FormEvent) => {
     e.preventDefault()
     const trimmed = input.trim()
     if (!trimmed || connectionState !== 'connected') return
     setInput('')
+    // Reset textarea height
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
     sendMessage(trimmed)
   }, [input, connectionState, sendMessage])
 
@@ -126,6 +197,18 @@ export default function ChatScreen() {
       handleSubmit(e)
     }
   }, [handleSubmit])
+
+  const handleAbort = useCallback(() => {
+    abortChat()
+  }, [abortChat])
+
+  // Is this message the last assistant message? (for retry button)
+  const lastAssistantIdx = (() => {
+    for (let i = currentMessages.length - 1; i >= 0; i--) {
+      if (currentMessages[i].role === 'assistant') return i
+    }
+    return -1
+  })()
 
   return (
     <div className="flex flex-col h-full">
@@ -145,7 +228,9 @@ export default function ChatScreen() {
           <h1 className="font-semibold text-[15px] text-gray-900 dark:text-white truncate max-w-[200px]">
             {displayName}
           </h1>
-          <ConnectionIndicator />
+          <div className="flex items-center gap-1 mt-0.5">
+            <ConnectionDot />
+          </div>
         </div>
 
         <button
@@ -160,11 +245,14 @@ export default function ChatScreen() {
         </button>
       </header>
 
+      {/* Connection banner */}
+      <ConnectionBanner />
+
       {/* Messages */}
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0"
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-0"
       >
         {currentMessages.length === 0 && !currentStreaming?.isStreaming && (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
@@ -178,16 +266,36 @@ export default function ChatScreen() {
           </div>
         )}
 
-        {currentMessages.map((msg, i) => (
-          <MessageBubble key={i} role={msg.role} content={msg.content} />
-        ))}
+        {currentMessages.map((msg, i) => {
+          const isNew = i >= prevMessageCountRef.current
+          const isLastAssistant = i === lastAssistantIdx
+          return (
+            <MessageBubble
+              key={`${currentSessionKey}-${i}`}
+              role={msg.role}
+              content={msg.content}
+              timestamp={msg.timestamp}
+              index={i}
+              sessionKey={currentSessionKey}
+              animate={isNew}
+              showRetry={isLastAssistant && !generating}
+              onRetry={retryLastMessage}
+            />
+          )
+        })}
 
         {currentStreaming?.isStreaming && currentStreaming.content.length > 0 && (
-          <MessageBubble role="assistant" content={currentStreaming.content} isStreaming />
+          <MessageBubble
+            role="assistant"
+            content={currentStreaming.content}
+            isStreaming
+            index={-1}
+            sessionKey={currentSessionKey}
+          />
         )}
 
         {isTyping && !currentStreaming?.isStreaming && (
-          <div className="flex justify-start">
+          <div className="flex justify-start animate-fade-in">
             <div className="message-bubble message-bubble-assistant">
               <div className="flex items-center gap-1 py-1 px-0.5">
                 <span className="w-2 h-2 rounded-full bg-amber-600/60 dark:bg-amber-500/60 animate-bounce [animation-delay:0ms]" />
@@ -211,29 +319,42 @@ export default function ChatScreen() {
         style={{ paddingBottom: 'calc(var(--kb-height, 0px) + 10px)' }}
       >
         <textarea
-          ref={inputRef}
+          ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Message..."
           rows={1}
           className="flex-1 resize-none px-3.5 py-2.5 rounded-[20px] border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#231c14] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-700/40 dark:focus:ring-amber-600/40 focus:border-amber-400 dark:focus:border-amber-700 text-[15px]"
-          style={{ maxHeight: '120px' }}
+          style={{ maxHeight: '120px', overflow: 'auto' }}
           disabled={connectionState !== 'connected'}
         />
 
-        <button
-          type="submit"
-          disabled={!input.trim() || connectionState !== 'connected'}
-          onTouchStart={(e) => e.preventDefault()}
-          onMouseDown={(e) => e.preventDefault()}
-          className="flex items-center justify-center p-2.5 rounded-full bg-amber-800 text-white disabled:opacity-30 active:bg-amber-950 active:scale-95"
-          aria-label="Send message"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-          </svg>
-        </button>
+        {generating ? (
+          <button
+            type="button"
+            onClick={handleAbort}
+            className="flex items-center justify-center p-2.5 rounded-full bg-gray-600 dark:bg-gray-500 text-white active:bg-gray-700 active:scale-95 transition-all"
+            aria-label="Stop generating"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={!input.trim() || connectionState !== 'connected'}
+            onTouchStart={(e) => e.preventDefault()}
+            onMouseDown={(e) => e.preventDefault()}
+            className="flex items-center justify-center p-2.5 rounded-full bg-amber-800 text-white disabled:opacity-30 active:bg-amber-950 active:scale-95 transition-all"
+            aria-label="Send message"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+          </button>
+        )}
       </form>
     </div>
   )
