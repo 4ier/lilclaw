@@ -173,6 +173,13 @@
   font-size: 0.8rem;
   line-height: 1.55;
   -webkit-overflow-scrolling: touch;
+  background: #1a1a2e !important;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dark .prose-chat pre {
+  background: #0d0d14 !important;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .prose-chat pre code {
@@ -386,11 +393,16 @@
   @apply bg-gray-400 dark:bg-gray-500;
 }
 
-/* Code block scrollbar — thinner */
+/* Code block scrollbar — nearly invisible */
 .prose-chat pre::-webkit-scrollbar {
-  height: 3px;
+  height: 2px;
+}
+
+.prose-chat pre::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .prose-chat pre::-webkit-scrollbar-thumb {
-  @apply bg-gray-400 dark:bg-gray-600 rounded-full;
+  background: rgba(128, 128, 128, 0.25);
+  border-radius: 2px;
 }
