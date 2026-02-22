@@ -74,6 +74,7 @@ dependencies {
     implementation(libs.lifecycle.viewmodel)
     implementation(libs.navigation.compose)
     implementation(libs.datastore.preferences)
+    implementation(libs.webkit)
 
     // Koin DI
     implementation(libs.koin.android)

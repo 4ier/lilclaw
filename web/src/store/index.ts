@@ -258,7 +258,9 @@ export const useStore = create<AppState>()(
           } else if (theme === 'light') {
             document.documentElement.classList.remove('dark')
           } else {
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+            // "system" — prefer native Android signal, fall back to CSS media query
+            const prefersDark = (window as any).__SYSTEM_DARK ??
+              window.matchMedia('(prefers-color-scheme: dark)').matches
             document.documentElement.classList.toggle('dark', prefersDark)
           }
         },
@@ -291,23 +293,54 @@ export const useStore = create<AppState>()(
   )
 )
 
-// Initialize theme on load
+// Initialize theme on load + listen for system theme changes
 if (typeof window !== 'undefined') {
+  // Check URL param from Android WebView for initial system dark state
+  const urlParams = new URLSearchParams(window.location.search)
+  const darkParam = urlParams.get('dark')
+  if (darkParam !== null) {
+    ;(window as any).__SYSTEM_DARK = darkParam === '1'
+  }
+
+  const applyTheme = (theme: string) => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else if (theme === 'light') {
+      document.documentElement.classList.remove('dark')
+    } else {
+      // "system" — prefer native Android signal, fall back to CSS media query
+      const prefersDark = (window as any).__SYSTEM_DARK ??
+        window.matchMedia('(prefers-color-scheme: dark)').matches
+      document.documentElement.classList.toggle('dark', prefersDark)
+    }
+  }
+
   const stored = localStorage.getItem('lilclaw-chat-storage')
+  let initialTheme = 'system'
   if (stored) {
     try {
       const { state } = JSON.parse(stored)
-      if (state?.theme === 'dark') {
-        document.documentElement.classList.add('dark')
-      } else if (state?.theme !== 'light') {
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-        document.documentElement.classList.toggle('dark', prefersDark)
-      }
+      initialTheme = state?.theme || 'system'
     } catch {
       // Ignore parse errors
     }
-  } else {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    document.documentElement.classList.toggle('dark', prefersDark)
   }
+  applyTheme(initialTheme)
+
+  // Listen for OS theme changes — only applies when theme is "system"
+  // Standard: CSS media query change (works in browsers)
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    const currentTheme = useStore.getState().theme
+    if (currentTheme === 'system') {
+      applyTheme('system')
+    }
+  })
+  // Android WebView: custom event injected by Kotlin when system dark mode changes
+  window.addEventListener('systemthemechange', ((e: CustomEvent) => {
+    const currentTheme = useStore.getState().theme
+    if (currentTheme === 'system') {
+      const isDark = e.detail?.dark ?? false
+      document.documentElement.classList.toggle('dark', isDark)
+    }
+  }) as EventListener)
 }

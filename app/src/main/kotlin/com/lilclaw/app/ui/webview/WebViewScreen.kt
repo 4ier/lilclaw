@@ -1,6 +1,7 @@
 package com.lilclaw.app.ui.webview
 
 import android.annotation.SuppressLint
+import android.os.Build
 import android.util.Log
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
@@ -11,6 +12,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +28,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -33,6 +37,7 @@ fun WebViewScreen(
     onSettingsClick: () -> Unit,
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
+    val isSystemDark = isSystemInDarkTheme()
 
     BackHandler(enabled = webView?.canGoBack() == true) {
         webView?.goBack()
@@ -59,6 +64,14 @@ fun WebViewScreen(
     LaunchedEffect(kbHeightCssPx) {
         webView?.evaluateJavascript(
             "document.documentElement.style.setProperty('--kb-height','${kbHeightCssPx}px')",
+            null
+        )
+    }
+
+    // Notify the SPA when the system dark mode changes so "System" theme works.
+    LaunchedEffect(isSystemDark) {
+        webView?.evaluateJavascript(
+            "window.__SYSTEM_DARK=${isSystemDark};window.dispatchEvent(new CustomEvent('systemthemechange',{detail:{dark:${isSystemDark}}}))",
             null
         )
     }
@@ -95,6 +108,31 @@ fun WebViewScreen(
                 settings.cacheMode = WebSettings.LOAD_NO_CACHE
                 settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
 
+                // Enable WebView dark mode so prefers-color-scheme reports correctly
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+                        WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false)
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                        @Suppress("DEPRECATION")
+                        WebSettingsCompat.setForceDark(
+                            settings,
+                            if (isDark) WebSettingsCompat.FORCE_DARK_ON
+                            else WebSettingsCompat.FORCE_DARK_OFF
+                        )
+                    }
+                    @Suppress("DEPRECATION")
+                    if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK_STRATEGY)) {
+                        @Suppress("DEPRECATION")
+                        WebSettingsCompat.setForceDarkStrategy(
+                            settings,
+                            WebSettingsCompat.DARK_STRATEGY_PREFER_WEB_THEME_OVER_USER_AGENT_DARKENING
+                        )
+                    }
+                }
+
                 addJavascriptInterface(object {
                     @JavascriptInterface
                     fun openSettings() {
@@ -125,7 +163,7 @@ fun WebViewScreen(
 
                 // Set initial --kb-height before page loads
                 clearCache(true)
-                loadUrl(buildUrl())
+                loadUrl(buildUrl(isDark))
 
                 // Inject app version into WebView globals after page loads
                 val appVersion = com.lilclaw.app.BuildConfig.VERSION_NAME
@@ -138,5 +176,5 @@ fun WebViewScreen(
     )
 }
 
-private fun buildUrl(): String =
-    "http://127.0.0.1:3001/?_t=${System.currentTimeMillis()}"
+private fun buildUrl(isDark: Boolean = false): String =
+    "http://127.0.0.1:3001/?_t=${System.currentTimeMillis()}&dark=${if (isDark) "1" else "0"}"
