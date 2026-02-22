@@ -442,7 +442,7 @@ export default function ChatScreen() {
             onKeyDown={handleKeyDown}
             placeholder={activeAction ? activeAction.description : connectionState === 'connected' ? '输入消息...' : '输入消息（连接后自动发送）...'}
             rows={1}
-            className="flex-1 resize-none px-3.5 py-2.5 rounded-[20px] border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#231c14] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-700/40 dark:focus:ring-amber-600/40 focus:border-amber-400 dark:focus:border-amber-700 text-[15px]"
+            className="flex-1 resize-none px-3.5 py-2.5 rounded-[20px] border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#231c14] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-700/40 dark:focus:ring-amber-600/40 focus:border-amber-400 dark:focus:border-amber-700 text-base"
             style={{ maxHeight: '120px', overflow: 'auto' }}
           />
 
