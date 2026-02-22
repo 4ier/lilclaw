@@ -85,7 +85,7 @@ function SessionItem({
           onClick={handleDelete}
           className="absolute right-0 top-0 bottom-0 w-20 flex items-center justify-center bg-red-500 text-white text-sm font-medium"
         >
-          Delete
+          删除
         </button>
       )}
 
@@ -216,7 +216,7 @@ export default function SessionDrawer() {
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 safe-top">
           <h2 className="text-[17px] font-semibold text-gray-900 dark:text-white">
-            Sessions
+            对话
           </h2>
           <button
             onClick={close}
@@ -236,7 +236,7 @@ export default function SessionDrawer() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search sessions..."
+              placeholder="搜索对话..."
               className="w-full px-3 py-1.5 text-[13px] rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-amber-700/40"
             />
           </div>
@@ -270,7 +270,7 @@ export default function SessionDrawer() {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
-            <span>New chat</span>
+            <span>新对话</span>
           </button>
         </div>
       </div>

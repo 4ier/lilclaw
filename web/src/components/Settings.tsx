@@ -35,9 +35,9 @@ export default function Settings() {
   }, [setShowSettings])
 
   const themeOptions = [
-    { value: 'system', label: 'System' },
-    { value: 'light', label: 'Light' },
-    { value: 'dark', label: 'Dark' },
+    { value: 'system', label: '跟随系统' },
+    { value: 'light', label: '浅色' },
+    { value: 'dark', label: '深色' },
   ] as const
 
   const appVersion = window.__LILCLAW_VERSION || 'dev'
@@ -53,7 +53,7 @@ export default function Settings() {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 dark:border-gray-800">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Settings
+            设置
           </h2>
           <button
             onClick={() => setShowSettings(false)}
@@ -71,7 +71,7 @@ export default function Settings() {
           {/* Theme */}
           <div>
             <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
-              Appearance
+              外观
             </label>
             <div className="flex gap-2">
               {themeOptions.map((opt) => (
@@ -103,7 +103,7 @@ export default function Settings() {
                 <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
                 </svg>
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Provider</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">AI 服务</span>
               </div>
               <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -114,22 +114,26 @@ export default function Settings() {
           {/* Status */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">
-              Status
+              状态
             </label>
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[13px] text-gray-500 dark:text-gray-400">Gateway</span>
+                <span className="text-[13px] text-gray-500 dark:text-gray-400">服务</span>
                 <div className="flex items-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full ${
                     connectionState === 'connected' ? 'bg-emerald-500' :
                     connectionState === 'connecting' ? 'bg-amber-500 animate-pulse' :
                     'bg-red-500'
                   }`} />
-                  <span className="text-[13px] text-gray-700 dark:text-gray-300 capitalize">{connectionState}</span>
+                  <span className="text-[13px] text-gray-700 dark:text-gray-300">{
+                    connectionState === 'connected' ? '已连接' :
+                    connectionState === 'connecting' ? '连接中' :
+                    '未连接'
+                  }</span>
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[13px] text-gray-500 dark:text-gray-400">Port</span>
+                <span className="text-[13px] text-gray-500 dark:text-gray-400">端口</span>
                 <span className="text-[13px] text-gray-700 dark:text-gray-300 font-mono">3000</span>
               </div>
             </div>
@@ -145,7 +149,7 @@ export default function Settings() {
             onClick={() => setShowSettings(false)}
             className="py-2 px-4 rounded-xl text-sm font-medium text-gray-500 dark:text-gray-400 active:bg-gray-50 dark:active:bg-gray-800 transition-colors"
           >
-            Done
+            完成
           </button>
         </div>
       </div>
