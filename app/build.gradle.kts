@@ -13,8 +13,8 @@ android {
         minSdk = 26
         //noinspection OldTargetApi — targetSdk 28 required for proot execve (W^X exemption)
         targetSdk = 28
-        versionCode = 11
-        versionName = "0.5.5"
+        versionCode = 12
+        versionName = "0.5.6"
 
         ndk {
             abiFilters += listOf("arm64-v8a")
@@ -49,6 +49,10 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 
     applicationVariants.all {
@@ -94,4 +98,8 @@ dependencies {
 
     // Embedded HTTP server (for A11y/Device bridges)
     implementation(libs.nanohttpd)
+
+    // Testing
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
