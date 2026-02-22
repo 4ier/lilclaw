@@ -4,6 +4,7 @@ import MessageBubble from './MessageBubble'
 import ActionCards from './ActionCards'
 import type { ActionCard } from '../lib/actions'
 import { haptic } from '../lib/haptic'
+import { formatDateSeparator, isDifferentDay } from '../lib/dateSeparator'
 
 function ConnectionBanner() {
   const { connectionState, cacheLoaded, pendingMessages } = useStore()
@@ -334,18 +335,29 @@ export default function ChatScreen() {
           const isLastAssistant = i === lastAssistantIdx
           const prevRole = i > 0 ? currentMessages[i - 1].role : null
           const isGrouped = prevRole === msg.role
+          const prevTimestamp = i > 0 ? currentMessages[i - 1].timestamp : undefined
+          const showDateSep = i === 0 || isDifferentDay(prevTimestamp, msg.timestamp)
           return (
-            <div key={`${currentSessionKey}-${i}`} className={isGrouped ? '-mt-1' : ''}>
-              <MessageBubble
-                role={msg.role}
-                content={msg.content}
-                timestamp={msg.timestamp}
-                index={i}
-                sessionKey={currentSessionKey}
-                animate={isNew}
-                showRetry={isLastAssistant && !generating}
-                onRetry={retryLastMessage}
-              />
+            <div key={`${currentSessionKey}-${i}`}>
+              {showDateSep && msg.timestamp && (
+                <div className="flex items-center justify-center py-3">
+                  <span className="text-[12px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-3 py-0.5 rounded-full">
+                    {formatDateSeparator(msg.timestamp)}
+                  </span>
+                </div>
+              )}
+              <div className={isGrouped && !showDateSep ? '-mt-1' : ''}>
+                <MessageBubble
+                  role={msg.role}
+                  content={msg.content}
+                  timestamp={msg.timestamp}
+                  index={i}
+                  sessionKey={currentSessionKey}
+                  animate={isNew}
+                  showRetry={isLastAssistant && !generating}
+                  onRetry={retryLastMessage}
+                />
+              </div>
             </div>
           )
         })}
@@ -363,10 +375,13 @@ export default function ChatScreen() {
         {isTyping && !currentStreaming?.isStreaming && (
           <div className="flex justify-start animate-fade-in">
             <div className="message-bubble message-bubble-assistant">
-              <div className="flex items-center gap-1 py-1 px-0.5">
-                <span className="w-2 h-2 rounded-full bg-amber-600/60 dark:bg-amber-500/60 animate-bounce [animation-delay:0ms]" />
-                <span className="w-2 h-2 rounded-full bg-amber-600/60 dark:bg-amber-500/60 animate-bounce [animation-delay:150ms]" />
-                <span className="w-2 h-2 rounded-full bg-amber-600/60 dark:bg-amber-500/60 animate-bounce [animation-delay:300ms]" />
+              <div className="flex items-center gap-2 py-1 px-0.5">
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600/60 dark:bg-amber-500/60 animate-bounce [animation-delay:0ms]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600/60 dark:bg-amber-500/60 animate-bounce [animation-delay:150ms]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600/60 dark:bg-amber-500/60 animate-bounce [animation-delay:300ms]" />
+                </div>
+                <span className="text-[13px] text-gray-400 dark:text-gray-500">正在思考</span>
               </div>
             </div>
           </div>
