@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
+import ConfirmDialog from './ConfirmDialog'
 
 declare global {
   interface Window {
@@ -9,7 +10,8 @@ declare global {
 }
 
 export default function Settings() {
-  const { theme, fontSize, connectionState, setShowSettings, setTheme, setFontSize } = useStore()
+  const { theme, fontSize, connectionState, sessions, currentSessionKey, setShowSettings, setTheme, setFontSize } = useStore()
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
   const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -163,6 +165,16 @@ export default function Settings() {
               </div>
             </div>
           </div>
+
+          {/* Clear all conversations */}
+          {sessions.length > 1 && (
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              className="w-full py-3 px-4 rounded-xl bg-red-50 dark:bg-red-900/10 text-red-500 dark:text-red-400 text-sm font-medium active:bg-red-100 dark:active:bg-red-900/20 transition-colors"
+            >
+              清除所有对话
+            </button>
+          )}
         </div>
 
         {/* Footer */}
@@ -178,6 +190,28 @@ export default function Settings() {
           </button>
         </div>
       </div>
+
+      {showClearConfirm && (
+        <ConfirmDialog
+          title="清除所有对话"
+          message="将删除所有对话记录，此操作无法撤销。"
+          confirmLabel="全部清除"
+          danger
+          onConfirm={() => {
+            const { deleteSession } = useStore.getState()
+            sessions.forEach(s => {
+              if (s.key !== currentSessionKey) deleteSession(s.key)
+            })
+            // Clear current session messages
+            useStore.setState((state) => ({
+              messages: { ...state.messages, [currentSessionKey]: [] },
+            }))
+            setShowClearConfirm(false)
+            setShowSettings(false)
+          }}
+          onCancel={() => setShowClearConfirm(false)}
+        />
+      )}
     </div>
   )
 }
