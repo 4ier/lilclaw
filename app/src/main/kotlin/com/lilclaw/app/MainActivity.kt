@@ -9,9 +9,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import com.lilclaw.app.navigation.AppNavigation
 import com.lilclaw.app.ui.theme.LilClawTheme
+import com.lilclaw.app.ui.webview.NativeBridge
 
 class MainActivity : ComponentActivity() {
+    lateinit var nativeBridge: NativeBridge
+        private set
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        // NativeBridge must be created before setContent so launchers register in time
+        nativeBridge = NativeBridge(this) { null } // webView set later
+        nativeBridge.registerLaunchers()
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
@@ -51,5 +59,10 @@ class MainActivity : ComponentActivity() {
                     android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
             }
         }
+    }
+
+    override fun onDestroy() {
+        nativeBridge.destroy()
+        super.onDestroy()
     }
 }

@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.os.Build
 import android.util.Log
 import android.webkit.ConsoleMessage
-import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -20,16 +19,19 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
+import com.lilclaw.app.MainActivity
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -38,6 +40,20 @@ fun WebViewScreen(
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     val isSystemDark = isSystemInDarkTheme()
+    val context = LocalContext.current
+    val mainActivity = context as? MainActivity
+
+    // Wire up webView reference and settings callback to bridge
+    DisposableEffect(webView) {
+        if (mainActivity != null) {
+            mainActivity.nativeBridge.setWebView { webView }
+            mainActivity.nativeBridge.onSettingsClick = onSettingsClick
+        }
+        onDispose {
+            mainActivity?.nativeBridge?.setWebView { null }
+            mainActivity?.nativeBridge?.onSettingsClick = null
+        }
+    }
 
     BackHandler(enabled = webView?.canGoBack() == true) {
         webView?.goBack()
@@ -51,16 +67,11 @@ fun WebViewScreen(
     val systemTopDp = with(density) { systemBarsInsets.getTop(density).toDp() }
     val systemBottomPx = systemBarsInsets.getBottom(density)
 
-    // Keyboard height in CSS px (device px / density).
-    // When keyboard is closed, imeBottomPx == 0 or <= systemBottomPx.
     val kbHeightCssPx = with(density) {
         val extra = (imeBottomPx - systemBottomPx).coerceAtLeast(0)
         (extra / density.density).toInt()
     }
 
-    // Inject keyboard height into WebView as a CSS custom property.
-    // This avoids resizing the WebView container (which triggers expensive HTML relayout).
-    // The SPA uses `var(--kb-height)` to add bottom padding to the input bar.
     LaunchedEffect(kbHeightCssPx) {
         webView?.evaluateJavascript(
             "document.documentElement.style.setProperty('--kb-height','${kbHeightCssPx}px')",
@@ -87,16 +98,15 @@ fun WebViewScreen(
             .padding(top = systemTopDp, bottom = systemBottomDp)
             .consumeWindowInsets(WindowInsets.systemBars)
             .consumeWindowInsets(WindowInsets.ime),
-        factory = { context ->
-            WebView(context).apply {
+        factory = { ctx ->
+            WebView(ctx).apply {
                 WebView.setWebContentsDebuggingEnabled(true)
 
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
                 overScrollMode = WebView.OVER_SCROLL_NEVER
 
-                // Match dark/light background to avoid white flash before SPA loads
-                val isDark = (context.resources.configuration.uiMode
+                val isDark = (ctx.resources.configuration.uiMode
                     and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
                     android.content.res.Configuration.UI_MODE_NIGHT_YES
                 setBackgroundColor(if (isDark) android.graphics.Color.parseColor("#1a1410") else android.graphics.Color.WHITE)
@@ -134,19 +144,27 @@ fun WebViewScreen(
                     }
                 }
 
-                addJavascriptInterface(object {
-                    @JavascriptInterface
-                    fun openSettings() {
-                        post { onSettingsClick() }
-                    }
+                // Add the native bridge — use the activity's bridge for camera/voice/haptic,
+                // plus a settings wrapper
+                val bridge = mainActivity?.nativeBridge
+                if (bridge != null) {
+                    addJavascriptInterface(bridge, "LilClaw")
+                } else {
+                    // Fallback: settings-only bridge
+                    addJavascriptInterface(object {
+                        @android.webkit.JavascriptInterface
+                        fun openSettings() {
+                            post { onSettingsClick() }
+                        }
 
-                    @JavascriptInterface
-                    fun isSystemDarkMode(): Boolean {
-                        return (context.resources.configuration.uiMode
-                            and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                            android.content.res.Configuration.UI_MODE_NIGHT_YES
-                    }
-                }, "LilClaw")
+                        @android.webkit.JavascriptInterface
+                        fun isSystemDarkMode(): Boolean {
+                            return (ctx.resources.configuration.uiMode
+                                and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                                android.content.res.Configuration.UI_MODE_NIGHT_YES
+                        }
+                    }, "LilClaw")
+                }
 
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
@@ -179,7 +197,6 @@ fun WebViewScreen(
                     }
                 }
 
-                // Set initial --kb-height before page loads
                 clearCache(true)
                 loadUrl(buildUrl(isDark))
 
