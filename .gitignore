@@ -31,3 +31,6 @@ web/tsconfig.tsbuildinfo
 
 # Monorepo root
 node_modules/
+
+# Bundled rootfs layers (large binary assets)
+app/src/main/assets/rootfs/*.tar.gz
