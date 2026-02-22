@@ -18,7 +18,7 @@ function ConnectionBanner() {
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
-        <span>Sending {pendingCount} queued message{pendingCount > 1 ? 's' : ''}...</span>
+        <span>正在发送 {pendingCount} 条消息...</span>
       </div>
     )
   }
@@ -29,23 +29,23 @@ function ConnectionBanner() {
       bg: 'bg-amber-50 dark:bg-amber-900/20',
       label: cacheLoaded
         ? pendingCount > 0
-          ? `Connecting... (${pendingCount} message${pendingCount > 1 ? 's' : ''} queued)`
-          : 'Connecting to gateway...'
-        : 'Loading...',
+          ? `正在连接... (${pendingCount} 条消息待发送)`
+          : '正在连接...'
+        : '加载中...',
     },
     disconnected: {
       color: 'text-gray-500 dark:text-gray-400',
       bg: 'bg-gray-50 dark:bg-gray-800',
       label: pendingCount > 0
-        ? `Offline · ${pendingCount} message${pendingCount > 1 ? 's' : ''} queued`
-        : 'Gateway offline',
+        ? `未连接 · ${pendingCount} 条消息待发送`
+        : '未连接',
     },
     error: {
       color: 'text-red-600 dark:text-red-400',
       bg: 'bg-red-50 dark:bg-red-900/20',
       label: pendingCount > 0
-        ? `Connection error · ${pendingCount} queued — retrying...`
-        : 'Connection error — retrying...',
+        ? `连接出错 · ${pendingCount} 条待发 · 重试中...`
+        : '连接出错，重试中...',
     },
   }
 
@@ -78,16 +78,16 @@ function ConnectionDot() {
 }
 
 const TOOL_DISPLAY: Record<string, { icon: string; label: string }> = {
-  exec: { icon: '💻', label: 'Running command...' },
-  web_search: { icon: '🔍', label: 'Searching web...' },
-  web_fetch: { icon: '🌐', label: 'Fetching page...' },
-  browser: { icon: '🌐', label: 'Using browser...' },
-  read: { icon: '📄', label: 'Reading file...' },
-  write: { icon: '📝', label: 'Writing file...' },
-  edit: { icon: '✏️', label: 'Editing file...' },
-  memory_search: { icon: '🧠', label: 'Searching memory...' },
-  message: { icon: '💬', label: 'Sending message...' },
-  tts: { icon: '🔊', label: 'Generating speech...' },
+  exec: { icon: '💻', label: '正在执行命令...' },
+  web_search: { icon: '🔍', label: '正在搜索...' },
+  web_fetch: { icon: '🌐', label: '正在读取网页...' },
+  browser: { icon: '🌐', label: '正在浏览网页...' },
+  read: { icon: '📄', label: '正在读取文件...' },
+  write: { icon: '📝', label: '正在写入文件...' },
+  edit: { icon: '✏️', label: '正在修改文件...' },
+  memory_search: { icon: '🧠', label: '正在回忆...' },
+  message: { icon: '💬', label: '正在发送消息...' },
+  tts: { icon: '🔊', label: '正在生成语音...' },
 }
 
 function AgentStatus() {
@@ -100,7 +100,7 @@ function AgentStatus() {
   const toolName = (data?.tool || data?.name || '') as string
 
   let icon = '⚙️'
-  let label = 'Thinking...'
+  let label = '思考中...'
 
   if (state.kind === 'tool_use') {
     const display = TOOL_DISPLAY[toolName]
@@ -108,16 +108,16 @@ function AgentStatus() {
       icon = display.icon
       label = display.label
     } else if (toolName) {
-      label = `Using ${toolName}...`
+      label = `正在使用 ${toolName}...`
     } else {
-      label = 'Using tools...'
+      label = '正在处理...'
     }
   } else if (state.kind === 'thinking') {
     icon = '💭'
-    label = 'Thinking...'
+    label = '思考中...'
   } else if (state.kind === 'error') {
     icon = '⚠️'
-    label = 'Error occurred'
+    label = '出错了'
   }
 
   return (
@@ -324,7 +324,7 @@ export default function ChatScreen() {
               <ellipse cx="70" cy="28" rx="10" ry="12" />
               <ellipse cx="50" cy="55" rx="18" ry="20" />
             </svg>
-            <p className="text-base font-medium text-gray-500 dark:text-gray-400 mb-6">What can I help with?</p>
+            <p className="text-lg font-medium text-gray-500 dark:text-gray-400 mb-6">有什么我能帮你的？</p>
             <ActionCards onSelect={handleActionSelect} />
           </div>
         )}
@@ -440,7 +440,7 @@ export default function ChatScreen() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={activeAction ? activeAction.description : connectionState === 'connected' ? 'Message...' : 'Message (will send when connected)...'}
+            placeholder={activeAction ? activeAction.description : connectionState === 'connected' ? '输入消息...' : '输入消息（连接后自动发送）...'}
             rows={1}
             className="flex-1 resize-none px-3.5 py-2.5 rounded-[20px] border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#231c14] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-700/40 dark:focus:ring-amber-600/40 focus:border-amber-400 dark:focus:border-amber-700 text-[15px]"
             style={{ maxHeight: '120px', overflow: 'auto' }}

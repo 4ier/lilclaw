@@ -429,8 +429,8 @@ export const useStore = create<AppState>()(
         getSessionDisplayName: (key: string) => {
           const session = get().sessions.find((s) => s.key === key)
           const raw = session?.label?.trim() || session?.displayName?.trim() || key
-          if (raw === 'main') return 'LilClaw'
-          if (/^chat-\d+$/.test(raw)) return 'New Chat'
+          if (raw === 'main') return '小爪'
+          if (/^chat-\d+$/.test(raw)) return '新对话'
           return raw
         },
 
