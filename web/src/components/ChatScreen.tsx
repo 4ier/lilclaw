@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react'
 import { useStore } from '../store'
 import MessageBubble from './MessageBubble'
+import ActionCards from './ActionCards'
+import type { ActionCard } from '../lib/actions'
 
 function ConnectionBanner() {
   const { connectionState, cacheLoaded } = useStore()
@@ -188,15 +190,44 @@ export default function ChatScreen() {
     adjustTextareaHeight()
   }, [input, adjustTextareaHeight])
 
+  // Handle Action Card selection
+  const handleActionSelect = useCallback((action: ActionCard) => {
+    if (action.inputMode === 'text' || action.inputMode === 'url') {
+      // For text/url actions, pre-fill the textarea with a prompt hint
+      setInput('')
+      textareaRef.current?.focus()
+      // Set a placeholder hint based on the action
+      setActiveAction(action)
+    } else if (action.inputMode === 'camera') {
+      // Try native bridge, fallback to text input
+      if (window.LilClaw && 'takePhoto' in window.LilClaw) {
+        (window.LilClaw as { takePhoto: () => void }).takePhoto()
+      } else {
+        setActiveAction(action)
+        textareaRef.current?.focus()
+      }
+    }
+  }, [])
+
+  const [activeAction, setActiveAction] = useState<ActionCard | null>(null)
+
+  // Clear active action when message is sent
   const handleSubmit = useCallback((e: FormEvent) => {
     e.preventDefault()
     const trimmed = input.trim()
     if (!trimmed || connectionState !== 'connected') return
     setInput('')
-    // Reset textarea height
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
-    sendMessage(trimmed)
-  }, [input, connectionState, sendMessage])
+
+    // Apply action template if active
+    let finalMessage = trimmed
+    if (activeAction) {
+      finalMessage = activeAction.promptTemplate.replace('${input}', trimmed)
+      setActiveAction(null)
+    }
+
+    sendMessage(finalMessage)
+  }, [input, connectionState, sendMessage, activeAction])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -269,24 +300,9 @@ export default function ChatScreen() {
               <ellipse cx="70" cy="28" rx="10" ry="12" />
               <ellipse cx="50" cy="55" rx="18" ry="20" />
             </svg>
-            <p className="text-base font-medium text-gray-500 dark:text-gray-400 mb-6">What's on your mind?</p>
+            <p className="text-base font-medium text-gray-500 dark:text-gray-400 mb-6">What can I help with?</p>
             {connectionState === 'connected' && (
-              <div className="flex flex-wrap justify-center gap-2 max-w-[320px]">
-                {[
-                  'Summarize a webpage',
-                  'Write a script',
-                  'Explain a concept',
-                  'Help me debug',
-                ].map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => sendMessage(suggestion)}
-                    className="px-3 py-1.5 text-[13px] rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 transition-all"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
+              <ActionCards onSelect={handleActionSelect} />
             )}
           </div>
         )}
@@ -356,45 +372,84 @@ export default function ChatScreen() {
       {/* Input bar */}
       <form
         onSubmit={handleSubmit}
-        className="flex items-end gap-2 px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1a1410] flex-shrink-0"
-        style={{ paddingBottom: 'calc(var(--kb-height, 0px) + 10px)' }}
+        className="flex flex-col border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1a1410] flex-shrink-0"
+        style={{ paddingBottom: 'var(--kb-height, 0px)' }}
       >
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Message..."
-          rows={1}
-          className="flex-1 resize-none px-3.5 py-2.5 rounded-[20px] border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#231c14] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-700/40 dark:focus:ring-amber-600/40 focus:border-amber-400 dark:focus:border-amber-700 text-[15px]"
-          style={{ maxHeight: '120px', overflow: 'auto' }}
-          disabled={connectionState !== 'connected'}
-        />
+        {/* Active action indicator */}
+        {activeAction && (
+          <div className="flex items-center gap-2 px-3 pt-2 pb-0">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+              <span className="text-sm">{activeAction.icon}</span>
+              <span className="text-[12px] font-medium text-amber-800 dark:text-amber-400">{activeAction.title}</span>
+              <button
+                type="button"
+                onClick={() => setActiveAction(null)}
+                className="ml-0.5 text-amber-600 dark:text-amber-500"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
 
-        {generating ? (
+        <div className="flex items-end gap-2 px-3 py-2.5">
+          {/* Attachment button */}
           <button
             type="button"
-            onClick={handleAbort}
-            className="flex items-center justify-center p-2.5 rounded-full bg-gray-600 dark:bg-gray-500 text-white active:bg-gray-700 active:scale-95 transition-all"
-            aria-label="Stop generating"
+            onClick={() => {
+              // TODO: Open attachment picker bottom sheet
+              // For now, native bridge stub
+              if (window.LilClaw && 'pickImage' in window.LilClaw) {
+                (window.LilClaw as { pickImage: () => void }).pickImage()
+              }
+            }}
+            className="flex items-center justify-center p-2 rounded-full text-gray-400 dark:text-gray-500 active:bg-gray-100 dark:active:bg-gray-800 transition-colors"
+            aria-label="Attach"
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="6" y="6" width="12" height="12" rx="2" />
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
           </button>
-        ) : (
-          <button
-            type="submit"
-            disabled={!input.trim() || connectionState !== 'connected'}
-            onMouseDown={(e) => e.preventDefault()}
-            className="flex items-center justify-center p-2.5 rounded-full bg-amber-800 text-white disabled:opacity-30 active:bg-amber-950 active:scale-95 transition-all"
-            aria-label="Send message"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
-          </button>
-        )}
+
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={activeAction ? activeAction.description : 'Message...'}
+            rows={1}
+            className="flex-1 resize-none px-3.5 py-2.5 rounded-[20px] border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#231c14] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-700/40 dark:focus:ring-amber-600/40 focus:border-amber-400 dark:focus:border-amber-700 text-[15px]"
+            style={{ maxHeight: '120px', overflow: 'auto' }}
+            disabled={connectionState !== 'connected'}
+          />
+
+          {generating ? (
+            <button
+              type="button"
+              onClick={handleAbort}
+              className="flex items-center justify-center p-2.5 rounded-full bg-gray-600 dark:bg-gray-500 text-white active:bg-gray-700 active:scale-95 transition-all"
+              aria-label="Stop generating"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!input.trim() || connectionState !== 'connected'}
+              onMouseDown={(e) => e.preventDefault()}
+              className="flex items-center justify-center p-2.5 rounded-full bg-amber-800 text-white disabled:opacity-30 active:bg-amber-950 active:scale-95 transition-all"
+              aria-label="Send message"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </button>
+          )}
+        </div>
       </form>
     </div>
   )
