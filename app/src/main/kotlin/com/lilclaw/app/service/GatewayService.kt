@@ -120,7 +120,7 @@ class GatewayService : Service() {
             PowerManager.PARTIAL_WAKE_LOCK,
             "LilClaw::GatewayWakeLock",
         ).apply {
-            acquire(10 * 60 * 1000L)
+            acquire() // No timeout — release only when service stops
         }
     }
 

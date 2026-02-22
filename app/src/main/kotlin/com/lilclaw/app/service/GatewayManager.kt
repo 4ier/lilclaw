@@ -219,19 +219,29 @@ class GatewayManager(private val context: Context) {
     }
 
     private suspend fun waitForReady(port: Int, onReady: () -> Unit) {
-        log("等待引擎就绪...")
-        waitForPort(port, timeoutMs = 60_000)
-        _progress.value = 0.9f
-
-        _state.value = GatewayState.WaitingForUi
+        // Start serve-ui polling FIRST — it's fast (~2s)
+        // The SPA handles offline gateway gracefully
         log("等待界面就绪...")
         waitForPort(3001, timeoutMs = 30_000)
+        _progress.value = 0.7f
+        log("Chat UI ready — loading WebView")
+
+        // Signal that UI is ready (WebView can load now!)
+        _state.value = GatewayState.WaitingForUi
+        onReady()
+
+        // Now wait for gateway in background
+        log("Waiting for gateway...")
+        waitForPort(port, timeoutMs = 60_000)
         _progress.value = 1f
 
         log("就绪")
         _state.value = GatewayState.Running
         GatewayService.updateStatus(context, "运行中")
         onReady()
+
+        // Start monitoring gateway process for crash recovery
+        monitorGateway(port)
     }
 
     private suspend fun waitForPort(port: Int, timeoutMs: Long) = withContext(Dispatchers.IO) {
@@ -256,5 +266,38 @@ class GatewayManager(private val context: Context) {
             delay(500)
         }
         throw RuntimeException("Port $port not ready after ${timeoutMs / 1000}s: $lastError")
+    }
+
+    /**
+     * Monitor gateway process health. If it dies, auto-restart up to 3 times.
+     */
+    private fun monitorGateway(port: Int) {
+        scope.launch {
+            var restartCount = 0
+            val maxRestarts = 3
+            while (restartCount < maxRestarts) {
+                delay(5000) // Check every 5 seconds
+                val process = processes.gatewayProcess
+                if (process == null || !process.isAlive) {
+                    if (_state.value == GatewayState.Idle) break // Intentional stop
+                    restartCount++
+                    log("Gateway crashed! Restarting ($restartCount/$maxRestarts)...")
+                    _state.value = GatewayState.Starting
+                    GatewayService.updateStatus(context, "Restarting... ($restartCount/$maxRestarts)")
+                    try {
+                        val gwProcess = processes.startGateway(port)
+                        pumpProcessLog(gwProcess, "gw")
+                        waitForPort(port, timeoutMs = 30_000)
+                        _state.value = GatewayState.Running
+                        GatewayService.updateStatus(context, "Running")
+                        log("Gateway restarted successfully")
+                        restartCount = 0 // Reset counter on success
+                    } catch (e: Exception) {
+                        log("Restart failed: ${e.message}")
+                        _state.value = GatewayState.Error("Gateway crashed ($restartCount/$maxRestarts)")
+                    }
+                }
+            }
+        }
     }
 }
