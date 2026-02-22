@@ -153,6 +153,8 @@ export default function MessageBubble({
   const isUser = role === 'user'
   const [showTimestamp, setShowTimestamp] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [expanded, setExpanded] = useState(false)
+  const [copied, setCopied] = useState(false)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const bubbleRef = useRef<HTMLDivElement>(null)
@@ -252,7 +254,7 @@ export default function MessageBubble({
               />
             ))}
 
-            <div className={`prose-chat ${isStreaming ? 'cursor-blink' : ''}`}>
+            <div className={`prose-chat ${isStreaming ? 'cursor-blink' : ''} ${!isUser && !expanded && textContent.length > 500 ? 'max-h-[200px] overflow-hidden relative' : ''}`}>
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeHighlight, rehypeRaw]}
@@ -275,28 +277,62 @@ export default function MessageBubble({
               >
                 {textContent}
               </ReactMarkdown>
+              {!isUser && !expanded && textContent.length > 500 && (
+                <div className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none" style={{ background: `linear-gradient(transparent, var(--bubble-bg))` }} />
+              )}
             </div>
+
+            {/* Expand button for long messages */}
+            {!isUser && !expanded && textContent.length > 500 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setExpanded(true) }}
+                className="mt-1 text-[13px] text-amber-700 dark:text-amber-500 font-medium"
+              >
+                展开全文 ▼
+              </button>
+            )}
+            {!isUser && expanded && textContent.length > 500 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setExpanded(false) }}
+                className="mt-1 text-[13px] text-amber-700 dark:text-amber-500 font-medium"
+              >
+                收起 ▲
+              </button>
+            )}
           </div>
 
-          {/* Timestamp */}
-          {showTimestamp && timestamp && (
-            <div className={`text-[11px] text-gray-400 dark:text-gray-500 mt-1 ${isUser ? 'text-right pr-1' : 'pl-1'}`}>
-              {formatRelativeTime(timestamp)}
-            </div>
-          )}
-
-          {/* Retry button */}
-          {showRetry && onRetry && (
-            <button
-              onClick={onRetry}
-              className="flex items-center gap-1 mt-1 pl-1 text-[12px] text-gray-400 dark:text-gray-500 hover:text-amber-700 dark:hover:text-amber-500 transition-colors"
-            >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span>重试</span>
-            </button>
-          )}
+          {/* Action row: timestamp + copy + retry for assistant */}
+          <div className={`flex items-center gap-3 mt-1 ${isUser ? 'justify-end pr-1' : 'pl-1'}`}>
+            {showTimestamp && timestamp && (
+              <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                {formatRelativeTime(timestamp)}
+              </span>
+            )}
+            {!isUser && !isStreaming && textContent.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  navigator.clipboard.writeText(textContent)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 1500)
+                }}
+                className="text-[12px] text-gray-400 dark:text-gray-500 active:text-amber-700 dark:active:text-amber-500 transition-colors"
+              >
+                {copied ? '✓ 已复制' : '📋 复制'}
+              </button>
+            )}
+            {showRetry && onRetry && (
+              <button
+                onClick={onRetry}
+                className="flex items-center gap-1 text-[12px] text-gray-400 dark:text-gray-500 active:text-amber-700 dark:active:text-amber-500 transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>重试</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
