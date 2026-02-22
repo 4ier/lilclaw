@@ -1,17 +1,20 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useStore } from '../store'
 import { formatRelativeTime } from '../lib/formatTime'
+import ConfirmDialog from './ConfirmDialog'
 
 function SessionItem({
   session,
   isActive,
   displayName,
+  preview,
   onSwitch,
   onDelete,
 }: {
   session: { key: string; label?: string; lastActivity?: number }
   isActive: boolean
   displayName: string
+  preview: string
   onSwitch: () => void
   onDelete: () => void
 }) {
@@ -122,11 +125,18 @@ function SessionItem({
           }`}>
             {displayName}
           </div>
-          {session.lastActivity && (
-            <div className="text-[11px] text-gray-400 dark:text-gray-500 truncate">
-              {formatRelativeTime(session.lastActivity)}
-            </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            {preview && (
+              <span className="text-[12px] text-gray-400 dark:text-gray-500 truncate flex-1 min-w-0">
+                {preview}
+              </span>
+            )}
+            {session.lastActivity && (
+              <span className="text-[11px] text-gray-400 dark:text-gray-500 flex-shrink-0">
+                {formatRelativeTime(session.lastActivity)}
+              </span>
+            )}
+          </div>
         </div>
         {isActive && (
           <div className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
@@ -140,6 +150,7 @@ export default function SessionDrawer() {
   const {
     showDrawer,
     sessions,
+    messages,
     currentSessionKey,
     switchSession,
     createSession,
@@ -148,8 +159,19 @@ export default function SessionDrawer() {
     getSessionDisplayName,
   } = useStore()
 
+  const getPreview = useCallback((key: string) => {
+    const msgs = messages[key]
+    if (!msgs || msgs.length === 0) return ''
+    const last = msgs[msgs.length - 1]
+    const text = typeof last.content === 'string' ? last.content : ''
+    // Strip markdown formatting for preview
+    const clean = text.replace(/[#*_`~\[\]]/g, '').replace(/\n+/g, ' ').trim()
+    return clean.length > 40 ? clean.slice(0, 40) + '…' : clean
+  }, [messages])
+
   const drawerRef = useRef<HTMLDivElement>(null)
   const [search, setSearch] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
   const close = useCallback(() => {
     setShowDrawer(false)
     setSearch('')
@@ -251,8 +273,9 @@ export default function SessionDrawer() {
                 session={session}
                 isActive={isActive}
                 displayName={getSessionDisplayName(session.key)}
+                preview={getPreview(session.key)}
                 onSwitch={() => { switchSession(session.key); close() }}
-                onDelete={() => deleteSession(session.key)}
+                onDelete={() => setPendingDelete(session.key)}
               />
             )
           })}
@@ -274,6 +297,18 @@ export default function SessionDrawer() {
           </button>
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      {pendingDelete && (
+        <ConfirmDialog
+          title="删除对话"
+          message="删除后无法恢复，确定要删除这个对话吗？"
+          confirmLabel="删除"
+          danger
+          onConfirm={() => { deleteSession(pendingDelete); setPendingDelete(null) }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   )
 }
