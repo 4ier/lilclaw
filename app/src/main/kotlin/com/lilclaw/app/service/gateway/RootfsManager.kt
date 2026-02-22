@@ -51,6 +51,11 @@ class RootfsManager(private val context: Context) {
                 "$RELEASES_BASE/chatspa-0.6.0.tar.gz",
                 247_612L, "242 KB"
             ),
+            LayerInfo(
+                "config", "config-0.1.0.tar.gz",
+                "$RELEASES_BASE/config-0.1.0.tar.gz",
+                2_052L, "2 KB"
+            ),
         )
     }
 
