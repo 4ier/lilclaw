@@ -36,6 +36,8 @@ class NativeBridge(
     }
     private var speechRecognizer: SpeechRecognizer? = null
     private var isListening = false
+    private var voiceTimeoutRunnable: Runnable? = null
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
     // Camera: TakePicture writes full-size image to this URI
     private var cameraImageUri: Uri? = null
@@ -141,6 +143,7 @@ class NativeBridge(
 
     @JavascriptInterface
     fun startVoice() {
+        Log.d("NativeBridge", "startVoice called, hasAudioPermission=${hasAudioPermission()}")
         activity.runOnUiThread {
             if (hasAudioPermission()) {
                 startVoiceInternal()
@@ -154,6 +157,7 @@ class NativeBridge(
     @JavascriptInterface
     fun stopVoice() {
         activity.runOnUiThread {
+            voiceTimeoutRunnable?.let { handler.removeCallbacks(it) }
             speechRecognizer?.stopListening()
             isListening = false
         }
@@ -162,20 +166,25 @@ class NativeBridge(
     @JavascriptInterface
     fun haptic(type: String) {
         activity.runOnUiThread {
-            val vibrator = activity.getSystemService(Vibrator::class.java) ?: return@runOnUiThread
-            val duration = when (type) {
-                "heavy" -> 30L
-                "medium" -> 15L
-                "selection" -> 5L
-                else -> 10L
+            try {
+                val vibrator = activity.getSystemService(Vibrator::class.java) ?: return@runOnUiThread
+                val duration = when (type) {
+                    "heavy" -> 30L
+                    "medium" -> 15L
+                    "selection" -> 5L
+                    else -> 10L
+                }
+                vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
+            } catch (e: SecurityException) {
+                Log.w("NativeBridge", "Vibrate permission denied, skipping haptic feedback")
             }
-            vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
         }
     }
 
     // --- Internal methods ---
 
     private fun startVoiceInternal() {
+        Log.d("NativeBridge", "startVoiceInternal, recognition available=${SpeechRecognizer.isRecognitionAvailable(activity)}")
         if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
             callJs("window.__lilclaw_onError?.('语音识别不可用')")
             return
@@ -196,6 +205,9 @@ class NativeBridge(
                     callJs("window.__lilclaw_onVoiceState?.('processing')")
                 }
                 override fun onError(error: Int) {
+                    voiceTimeoutRunnable?.let { handler.removeCallbacks(it) }
+                    // Skip ERROR_CLIENT (5) if we already stopped (e.g. from our timeout cancel)
+                    if (!isListening && error == SpeechRecognizer.ERROR_CLIENT) return
                     isListening = false
                     val msg = when (error) {
                         SpeechRecognizer.ERROR_NO_MATCH -> "没有听清，请再试一次"
@@ -207,6 +219,7 @@ class NativeBridge(
                     callJs("window.__lilclaw_onVoiceError?.('$msg')")
                 }
                 override fun onResults(results: Bundle?) {
+                    voiceTimeoutRunnable?.let { handler.removeCallbacks(it) }
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val text = matches?.firstOrNull() ?: ""
                     if (text.isNotEmpty()) {
@@ -233,6 +246,20 @@ class NativeBridge(
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         }
         speechRecognizer?.startListening(intent)
+
+        // Safety timeout: force-stop after 20s if no result/error from SpeechRecognizer
+        voiceTimeoutRunnable?.let { handler.removeCallbacks(it) }
+        voiceTimeoutRunnable = Runnable {
+            Log.d("NativeBridge", "Voice timeout fired, isListening=$isListening")
+            if (isListening) {
+                speechRecognizer?.cancel()
+                isListening = false
+                callJs("window.__lilclaw_onVoiceError?.('录音超时，请再试一次')")
+            }
+        }.also {
+            Log.d("NativeBridge", "Posting voice timeout in 20s")
+            handler.postDelayed(it, 20_000)
+        }
     }
 
     private fun launchCamera() {
@@ -320,6 +347,7 @@ class NativeBridge(
     }
 
     fun destroy() {
+        voiceTimeoutRunnable?.let { handler.removeCallbacks(it) }
         speechRecognizer?.destroy()
         speechRecognizer = null
     }

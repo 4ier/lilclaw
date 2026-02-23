@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { showToast } from './Toast'
 
 declare global {
@@ -14,15 +14,26 @@ interface VoiceButtonProps {
   onResult: (text: string) => void
 }
 
+const VOICE_TIMEOUT_MS = 15_000 // Auto-stop after 15s of silence
+
 export default function VoiceButton({ onResult }: VoiceButtonProps) {
   const [state, setState] = useState<'idle' | 'listening' | 'processing'>('idle')
   const [partial, setPartial] = useState('')
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const hasVoice = typeof window !== 'undefined' &&
     window.LilClaw && 'startVoice' in (window.LilClaw as unknown as Record<string, unknown>)
 
+  const clearVoiceTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }, [])
+
   useEffect(() => {
     window.__lilclaw_onVoiceText = (text: string) => {
+      clearVoiceTimeout()
       setState('idle')
       setPartial('')
       if (text.trim()) {
@@ -31,23 +42,31 @@ export default function VoiceButton({ onResult }: VoiceButtonProps) {
     }
     window.__lilclaw_onVoicePartial = (text: string) => {
       setPartial(text)
+      // Reset timeout on each partial result (user is still speaking)
+      clearVoiceTimeout()
+      timeoutRef.current = setTimeout(() => {
+        const bridge = window.LilClaw as unknown as { stopVoice?: () => void } | undefined
+        bridge?.stopVoice?.()
+      }, VOICE_TIMEOUT_MS)
     }
     window.__lilclaw_onVoiceState = (s: string) => {
       if (s === 'listening') setState('listening')
       else if (s === 'processing') setState('processing')
     }
     window.__lilclaw_onVoiceError = (error: string) => {
+      clearVoiceTimeout()
       setState('idle')
       setPartial('')
       showToast(error, 'error')
     }
     return () => {
+      clearVoiceTimeout()
       window.__lilclaw_onVoiceText = undefined
       window.__lilclaw_onVoicePartial = undefined
       window.__lilclaw_onVoiceState = undefined
       window.__lilclaw_onVoiceError = undefined
     }
-  }, [onResult])
+  }, [onResult, clearVoiceTimeout])
 
   const toggle = useCallback(() => {
     const bridge = window.LilClaw as unknown as { startVoice: () => void; stopVoice: () => void } | undefined
@@ -56,11 +75,16 @@ export default function VoiceButton({ onResult }: VoiceButtonProps) {
     if (state === 'idle') {
       bridge.startVoice()
       setState('listening')
+      // Safety timeout: auto-stop if no speech detected
+      timeoutRef.current = setTimeout(() => {
+        bridge.stopVoice()
+      }, VOICE_TIMEOUT_MS)
     } else if (state === 'listening') {
+      clearVoiceTimeout()
       bridge.stopVoice()
       setState('processing')
     }
-  }, [state])
+  }, [state, clearVoiceTimeout])
 
   if (!hasVoice) return null
 
