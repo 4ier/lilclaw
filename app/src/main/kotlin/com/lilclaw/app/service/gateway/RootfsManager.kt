@@ -80,22 +80,12 @@ class RootfsManager(private val context: Context) {
 
     /**
      * Find a bundled asset file for a layer.
-     * First tries exact manifest filename, then scans assets/rootfs/ for any file
-     * matching the layer name prefix (e.g. "chatspa-*.tar.gz").
-     * Returns the asset path (relative to assets/) or null if not found.
+     * CI and scripts/sync-layers.sh ensure assets match the manifest exactly.
+     * Checks both exact filename and .bin suffix (AAPT workaround).
      */
     private fun findBundledAsset(layer: LayerInfo): String? {
-        // Exact match first
-        val exactPath = "rootfs/${layer.assetFile}"
-        if (hasAssetFile(exactPath)) return resolveAssetPath(exactPath)
-
-        // Prefix scan: look for any rootfs/<name>-*.tar.gz
-        try {
-            val files = context.assets.list("rootfs") ?: return null
-            val prefix = "${layer.name}-"
-            val match = files.firstOrNull { it.startsWith(prefix) && (it.endsWith(".tar.gz") || it.endsWith(".tar.gz.bin")) }
-            if (match != null) return "rootfs/$match"
-        } catch (_: Exception) {}
+        val path = "rootfs/${layer.assetFile}"
+        if (hasAssetFile(path)) return resolveAssetPath(path)
         return null
     }
 
