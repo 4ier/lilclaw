@@ -47,9 +47,9 @@ class RootfsManager(private val context: Context) {
                 43_335_483L, "42 MB"
             ),
             LayerInfo(
-                "chatspa", "chatspa-0.7.0.tar.gz",
-                "$RELEASES_BASE/chatspa-0.7.0.tar.gz",
-                250_034L, "244 KB"
+                "chatspa", "chatspa-0.7.3.tar.gz",
+                "$RELEASES_BASE/chatspa-0.7.3.tar.gz",
+                250_219L, "244 KB"
             ),
             LayerInfo(
                 "config", "config-0.2.0.tar.gz",
@@ -79,6 +79,27 @@ class RootfsManager(private val context: Context) {
     // ── Full extraction (first-time setup) ────────────────
 
     /**
+     * Find a bundled asset file for a layer.
+     * First tries exact manifest filename, then scans assets/rootfs/ for any file
+     * matching the layer name prefix (e.g. "chatspa-*.tar.gz").
+     * Returns the asset path (relative to assets/) or null if not found.
+     */
+    private fun findBundledAsset(layer: LayerInfo): String? {
+        // Exact match first
+        val exactPath = "rootfs/${layer.assetFile}"
+        if (hasAssetFile(exactPath)) return resolveAssetPath(exactPath)
+
+        // Prefix scan: look for any rootfs/<name>-*.tar.gz
+        try {
+            val files = context.assets.list("rootfs") ?: return null
+            val prefix = "${layer.name}-"
+            val match = files.firstOrNull { it.startsWith(prefix) && (it.endsWith(".tar.gz") || it.endsWith(".tar.gz.bin")) }
+            if (match != null) return "rootfs/$match"
+        } catch (_: Exception) {}
+        return null
+    }
+
+    /**
      * Extract all layers from assets or network. Updates progress from 0 → 0.7.
      * @param onStateChange callback for UI state transitions
      * @param log callback for log lines
@@ -95,12 +116,12 @@ class RootfsManager(private val context: Context) {
 
         for (layer in layers) {
             val tarGzFile = File(context.cacheDir, "${layer.name}.tar.gz")
-            val hasAsset = hasAssetFile("rootfs/${layer.assetFile}")
+            val bundledAsset = findBundledAsset(layer)
 
-            if (hasAsset) {
+            if (bundledAsset != null) {
                 onStateChange("preparing")
                 log("正在解包 ${layer.name}...")
-                copyAssetToFile("rootfs/${layer.assetFile}", tarGzFile)
+                copyAssetToFile(bundledAsset, tarGzFile)
             } else {
                 onStateChange("downloading")
                 log("正在下载 ${layer.name} (${layer.displaySize})...")
@@ -159,9 +180,9 @@ class RootfsManager(private val context: Context) {
     suspend fun updateLayers(layers: List<LayerInfo>, log: (String) -> Unit) {
         for (layer in layers) {
             val tarGzFile = File(context.cacheDir, "${layer.name}.tar.gz")
-            val hasAsset = hasAssetFile("rootfs/${layer.assetFile}")
-            if (hasAsset) {
-                copyAssetToFile("rootfs/${layer.assetFile}", tarGzFile)
+            val bundledAsset = findBundledAsset(layer)
+            if (bundledAsset != null) {
+                copyAssetToFile(bundledAsset, tarGzFile)
             } else {
                 log("正在下载 ${layer.name} (${layer.displaySize})...")
                 downloadFile(layer.fallbackUrl, tarGzFile) { }
