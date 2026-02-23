@@ -14,9 +14,9 @@
     },
     {
       "name": "chatspa",
-      "file": "chatspa-0.7.0.tar.gz",
-      "version": "0.7.0",
-      "size": 250034
+      "file": "chatspa-0.7.3.tar.gz",
+      "version": "0.7.3",
+      "size": 250219
     },
     {
       "name": "config",

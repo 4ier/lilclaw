@@ -210,7 +210,7 @@ if [ "$DO_RELEASE" = true ] && [ "${SKIP_UPLOAD:-}" != "1" ]; then
     fi
     
     for f in "${BUILT_FILES[@]}"; do
-        local fname=$(basename "$f")
+        fname=$(basename "$f")
         echo "  Uploading $fname..."
         # Delete existing asset if present, then upload
         gh release delete-asset "$RELEASE_TAG" "$fname" --yes 2>/dev/null || true
