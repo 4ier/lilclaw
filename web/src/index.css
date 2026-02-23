@@ -413,6 +413,11 @@
   height: 2px;
 }
 
+/* Hide textarea scrollbar */
+textarea::-webkit-scrollbar {
+  display: none;
+}
+
 .prose-chat pre::-webkit-scrollbar-track {
   background: transparent;
 }
