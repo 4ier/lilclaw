@@ -173,7 +173,16 @@ export class GatewayClient {
         if (content) {
           // Normalize content to MessageContent[]
           const normalized: MessageContent[] = Array.isArray(content)
-            ? content.map((c: any) => ({ type: c.type || 'text', text: c.text, url: c.url }))
+            ? content.map((c: any) => {
+                if (c.type === 'image_url' && c.image_url?.url) {
+                  return { type: 'image' as const, url: c.image_url.url }
+                }
+                return {
+                  type: (c.type === 'image_url' ? 'image' : c.type || 'text') as 'text' | 'image',
+                  text: c.text,
+                  url: c.url || c.image_url?.url,
+                }
+              })
             : [{ type: 'text', text: String(content) }]
 
           this.callbacks.onChatEvent(
@@ -278,11 +287,16 @@ export class GatewayClient {
           // Normalize content - could be string or [{type,text}]
           let content: MessageContent[]
           if (Array.isArray(m.content)) {
-            content = m.content.map((c: any) => ({
-              type: c.type || 'text',
-              text: c.text,
-              url: c.url,
-            }))
+            content = m.content.map((c: any) => {
+              if (c.type === 'image_url' && c.image_url?.url) {
+                return { type: 'image' as const, url: c.image_url.url }
+              }
+              return {
+                type: (c.type === 'image_url' ? 'image' : c.type || 'text') as 'text' | 'image',
+                text: c.text,
+                url: c.url || c.image_url?.url,
+              }
+            })
           } else if (typeof m.content === 'string') {
             content = [{ type: 'text', text: m.content }]
           } else {

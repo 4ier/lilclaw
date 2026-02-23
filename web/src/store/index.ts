@@ -230,13 +230,20 @@ export const useStore = create<AppState>()(
           const { currentSessionKey, connectionState } = get()
 
           // Build content array — text + optional image thumbnails for display
-          const contentParts: MessageContent[] = [{ type: 'text', text: message }]
+          const contentParts: MessageContent[] = []
+          if (message) {
+            contentParts.push({ type: 'text', text: message })
+          }
           if (attachments) {
             for (const att of attachments) {
               if (att.mimeType.startsWith('image/')) {
                 contentParts.push({ type: 'image', url: `data:${att.mimeType};base64,${att.content}` })
               }
             }
+          }
+          // Ensure at least one content part
+          if (contentParts.length === 0) {
+            contentParts.push({ type: 'text', text: message })
           }
 
           const userMessage: ChatMessage = {

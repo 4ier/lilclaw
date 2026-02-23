@@ -211,9 +211,9 @@ export default function ChatScreen() {
     if (match) {
       const mimeType = match[1]
       const content = match[2]
-      const prompt = input.trim() || '这是什么？'
+      const prompt = input.trim()
       setInput('')
-      sendMessage(prompt, [{ mimeType, content }])
+      sendMessage(prompt || '', [{ mimeType, content }])
     } else {
       import('./Toast').then(m => m.showToast('图片格式错误', 'error'))
     }
