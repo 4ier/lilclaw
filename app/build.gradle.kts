@@ -13,8 +13,8 @@ android {
         minSdk = 26
         //noinspection OldTargetApi — targetSdk 28 required for proot execve (W^X exemption)
         targetSdk = 28
-        versionCode = 70
-        versionName = "0.7.0"
+        versionCode = 71
+        versionName = "0.7.1"
 
         ndk {
             abiFilters += listOf("arm64-v8a")
