@@ -311,7 +311,15 @@ export class GatewayClient {
           }
         })
         .filter((m) => m.content.length > 0) // Remove messages that became empty after stripping
-      this.callbacks.onHistoryLoaded(sessionKey, parsed)
+
+      // Filter out heartbeat exchanges and silent replies (system noise, not user conversation)
+      const filtered = parsed.filter((m) => {
+        const text = m.content.map((c) => c.text || '').join(' ')
+        if (m.role === 'user' && /HEARTBEAT\.md|heartbeat prompt/i.test(text)) return false
+        if (m.role === 'assistant' && /^\s*(HEARTBEAT_OK|NO_REPLY)\s*$/.test(text)) return false
+        return true
+      })
+      this.callbacks.onHistoryLoaded(sessionKey, filtered)
     }
   }
 

@@ -40,16 +40,6 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
 
-      - name: Check version not already released
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="v${{ steps.version.outputs.version }}"
-          if gh release view "$TAG" &>/dev/null; then
-            echo "::error::Release $TAG already exists. Bump versionName in build.gradle.kts before pushing."
-            exit 1
-          fi
-
       - name: Download rootfs layers
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -80,6 +70,8 @@ jobs:
           APK=$(ls app/build/outputs/apk/debug/lilclaw-v*.apk | head -1)
           APK_SIZE=$(du -h "$APK" | cut -f1)
           
+          # --clobber: update existing release if tag already exists (e.g. manual pre-release)
           gh release create "$TAG" "$APK" \
             --title "$TAG" \
-            --generate-notes
+            --generate-notes \
+            --clobber

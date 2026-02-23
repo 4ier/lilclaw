@@ -110,6 +110,11 @@ export const useStore = create<AppState>()(
             },
             onChatEvent: (rawSessionKey, eventState, content) => {
               const sessionKey = normalizeSessionKey(rawSessionKey)
+
+              // Filter out heartbeat responses and silent replies from display
+              const text = content.map((c) => c.text || '').join(' ').trim()
+              if (/^\s*HEARTBEAT_OK\s*$/.test(text) || /^\s*NO_REPLY\s*$/.test(text)) return
+
               if (eventState === 'delta') {
                 set((state) => ({
                   typing: { ...state.typing, [sessionKey]: false },
