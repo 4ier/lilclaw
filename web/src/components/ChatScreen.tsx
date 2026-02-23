@@ -206,23 +206,36 @@ export default function ChatScreen() {
   }, [])
 
   // Handle image picked from native bridge
+  const handleImageDataUrl = useCallback((dataUrl: string) => {
+    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+    if (match) {
+      const mimeType = match[1]
+      const content = match[2]
+      const prompt = input.trim() || '这是什么？'
+      setInput('')
+      sendMessage(prompt, [{ mimeType, content }])
+    } else {
+      import('./Toast').then(m => m.showToast('图片格式错误', 'error'))
+    }
+  }, [input, sendMessage, setInput])
+
   useEffect(() => {
     (window as unknown as Record<string, unknown>).__lilclaw_onImagePicked = (dataUrl: string) => {
-      // Parse data URL → base64 + mimeType for proper attachment protocol
-      const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
-      if (match) {
-        const mimeType = match[1]
-        const content = match[2]
-        const prompt = input.trim() || '这是什么？'
-        setInput('')
-        sendMessage(prompt, [{ mimeType, content }])
-      } else {
-        import('./Toast').then(m => m.showToast('图片格式错误', 'error'))
-      }
+      handleImageDataUrl(dataUrl)
     };
     (window as unknown as Record<string, unknown>).__lilclaw_onError = (error: string) => {
       import('./Toast').then(m => m.showToast(error, 'error'))
     }
+
+    // Check for pending image from native side (survives JS context loss)
+    try {
+      const bridge = window.LilClaw as unknown as { getPendingImage?: () => string } | undefined
+      const pending = bridge?.getPendingImage?.()
+      if (pending) {
+        handleImageDataUrl(pending)
+      }
+    } catch { /* bridge not available */ }
+
     return () => {
       delete (window as unknown as Record<string, unknown>).__lilclaw_onImagePicked
       delete (window as unknown as Record<string, unknown>).__lilclaw_onError
