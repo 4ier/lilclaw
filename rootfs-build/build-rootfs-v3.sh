@@ -130,6 +130,9 @@ if [ -d "$KOFFI_DIR" ]; then
         npm rebuild 2>&1 | tail -10
         echo "=== koffi native files ==="
         find . -name "*.node" -ls 2>/dev/null
+        # CRITICAL: delete glibc-linked linux_arm64/koffi.node (causes SIGSEGV under musl)
+        rm -f build/koffi/linux_arm64/koffi.node 2>/dev/null || true
+        echo "Deleted linux_arm64/koffi.node (glibc → musl fallback)"
         # Clean build tools
         apk del npm python3 make g++
         rm -rf /root/.npm /root/.cache /root/.node-gyp /tmp/* /var/cache/apk/*

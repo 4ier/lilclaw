@@ -86,6 +86,12 @@ chroot "$WORK" /usr/bin/qemu-aarch64-static /bin/sh -c '
     apk del python3 make g++ linux-headers
     rm -rf /root/.npm /root/.cache /root/.node-gyp /tmp/* /var/cache/apk/*
 
+    # === CRITICAL: koffi SIGSEGV fix ===
+    # linux_arm64/koffi.node is glibc-linked; causes SIGSEGV under musl (Alpine proot)
+    # Delete it so koffi falls back to musl_arm64/koffi.node
+    rm -f $OCDIR/koffi/build/koffi/linux_arm64/koffi.node 2>/dev/null || true
+    echo "koffi fix: deleted linux_arm64/koffi.node (glibc → musl fallback)"
+
     echo "After prune: $(du -sh /root/.npm-global | cut -f1)"
 
     # Final verify
