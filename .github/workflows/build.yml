@@ -70,8 +70,8 @@ jobs:
           APK=$(ls app/build/outputs/apk/debug/lilclaw-v*.apk | head -1)
           APK_SIZE=$(du -h "$APK" | cut -f1)
           
-          # --clobber: update existing release if tag already exists (e.g. manual pre-release)
+          # Delete existing release if present (gh on CI lacks --clobber)
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$TAG" "$APK" \
             --title "$TAG" \
-            --generate-notes \
-            --clobber
+            --generate-notes
