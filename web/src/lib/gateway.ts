@@ -250,14 +250,18 @@ export class GatewayClient {
     })
   }
 
-  async sendMessage(sessionKey: string, message: string): Promise<void> {
+  async sendMessage(sessionKey: string, message: string, attachments?: Array<{mimeType: string; content: string}>): Promise<void> {
     this.lastSessionKey = sessionKey
     const idempotencyKey = `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`
-    await this.sendRequest('chat.send', {
+    const params: Record<string, unknown> = {
       sessionKey,
       message,
       idempotencyKey,
-    })
+    }
+    if (attachments && attachments.length > 0) {
+      params.attachments = attachments
+    }
+    await this.sendRequest('chat.send', params)
   }
 
   async loadHistory(sessionKey: string, limit = 50): Promise<void> {

@@ -208,9 +208,17 @@ export default function ChatScreen() {
   // Handle image picked from native bridge
   useEffect(() => {
     (window as unknown as Record<string, unknown>).__lilclaw_onImagePicked = (dataUrl: string) => {
-      // Send as message with image attachment
-      // For now, just send the data URL as a message prefix
-      sendMessage(`[图片]\n${dataUrl}`)
+      // Parse data URL → base64 + mimeType for proper attachment protocol
+      const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+      if (match) {
+        const mimeType = match[1]
+        const content = match[2]
+        const prompt = input.trim() || '这是什么？'
+        setInput('')
+        sendMessage(prompt, [{ mimeType, content }])
+      } else {
+        import('./Toast').then(m => m.showToast('图片格式错误', 'error'))
+      }
     };
     (window as unknown as Record<string, unknown>).__lilclaw_onError = (error: string) => {
       import('./Toast').then(m => m.showToast(error, 'error'))
@@ -219,7 +227,7 @@ export default function ChatScreen() {
       delete (window as unknown as Record<string, unknown>).__lilclaw_onImagePicked
       delete (window as unknown as Record<string, unknown>).__lilclaw_onError
     }
-  }, [sendMessage])
+  }, [sendMessage, input])
   // Auto-grow textarea
   const adjustTextareaHeight = useCallback(() => {
     const el = textareaRef.current

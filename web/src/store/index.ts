@@ -50,7 +50,7 @@ interface AppState {
   // Actions
   connect: () => void
   disconnect: () => void
-  sendMessage: (message: string) => Promise<void>
+  sendMessage: (message: string, attachments?: Array<{mimeType: string; content: string}>) => Promise<void>
   abortChat: () => Promise<void>
   switchSession: (sessionKey: string) => void
   createSession: (sessionKey: string) => void
@@ -221,12 +221,22 @@ export const useStore = create<AppState>()(
           client?.disconnect()
         },
 
-        sendMessage: async (message: string) => {
+        sendMessage: async (message: string, attachments?: Array<{mimeType: string; content: string}>) => {
           const { currentSessionKey, connectionState } = get()
+
+          // Build content array — text + optional image thumbnails for display
+          const contentParts: MessageContent[] = [{ type: 'text', text: message }]
+          if (attachments) {
+            for (const att of attachments) {
+              if (att.mimeType.startsWith('image/')) {
+                contentParts.push({ type: 'image', url: `data:${att.mimeType};base64,${att.content}` })
+              }
+            }
+          }
 
           const userMessage: ChatMessage = {
             role: 'user',
-            content: [{ type: 'text', text: message }],
+            content: contentParts,
             timestamp: Date.now(),
           }
 
@@ -249,7 +259,7 @@ export const useStore = create<AppState>()(
           if (connectionState === 'connected') {
             // Online: send immediately
             try {
-              await client?.sendMessage(currentSessionKey, message)
+              await client?.sendMessage(currentSessionKey, message, attachments)
             } catch {
               // Failed to send — queue it
               set((state) => ({

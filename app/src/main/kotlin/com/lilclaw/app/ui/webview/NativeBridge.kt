@@ -91,6 +91,13 @@ class NativeBridge(
     }
 
     @JavascriptInterface
+    fun isSystemDarkMode(): Boolean {
+        return (activity.resources.configuration.uiMode
+            and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+    }
+
+    @JavascriptInterface
     fun takePhoto() {
         activity.runOnUiThread {
             if (hasCameraPermission()) {
