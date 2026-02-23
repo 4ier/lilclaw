@@ -224,14 +224,14 @@ class GatewayManager(private val context: Context) {
         log("等待界面就绪...")
         waitForPort(3001, timeoutMs = 30_000)
         _progress.value = 0.7f
-        log("Chat UI ready — loading WebView")
+        log("界面就绪，加载中...")
 
         // Signal that UI is ready (WebView can load now!)
         _state.value = GatewayState.WaitingForUi
         onReady()
 
         // Now wait for gateway in background
-        log("Waiting for gateway...")
+        log("等待引擎就绪...")
         waitForPort(port, timeoutMs = 60_000)
         _progress.value = 1f
 
@@ -281,7 +281,7 @@ class GatewayManager(private val context: Context) {
                 if (process == null || !process.isAlive) {
                     if (_state.value == GatewayState.Idle) break // Intentional stop
                     restartCount++
-                    log("Gateway crashed! Restarting ($restartCount/$maxRestarts)...")
+                    log("引擎崩溃，正在重启 ($restartCount/$maxRestarts)...")
                     _state.value = GatewayState.Starting
                     GatewayService.updateStatus(context, "Restarting... ($restartCount/$maxRestarts)")
                     try {
@@ -289,12 +289,12 @@ class GatewayManager(private val context: Context) {
                         pumpProcessLog(gwProcess, "gw")
                         waitForPort(port, timeoutMs = 30_000)
                         _state.value = GatewayState.Running
-                        GatewayService.updateStatus(context, "Running")
+                        GatewayService.updateStatus(context, "运行中")
                         log("Gateway restarted successfully")
                         restartCount = 0 // Reset counter on success
                     } catch (e: Exception) {
                         log("Restart failed: ${e.message}")
-                        _state.value = GatewayState.Error("Gateway crashed ($restartCount/$maxRestarts)")
+                        _state.value = GatewayState.Error("引擎崩溃 ($restartCount/$maxRestarts)")
                     }
                 }
             }
