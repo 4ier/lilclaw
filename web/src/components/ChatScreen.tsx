@@ -148,6 +148,7 @@ export default function ChatScreen() {
   } = useStore()
 
   const [input, setInput] = useState('')
+  const [pendingImage, setPendingImage] = useState<{mimeType: string; content: string; dataUrl: string} | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -205,19 +206,18 @@ export default function ChatScreen() {
     textareaRef.current?.focus()
   }, [])
 
-  // Handle image picked from native bridge
+  // Handle image picked from native bridge — stage it for caption
   const handleImageDataUrl = useCallback((dataUrl: string) => {
     const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
     if (match) {
       const mimeType = match[1]
       const content = match[2]
-      const prompt = input.trim()
-      setInput('')
-      sendMessage(prompt || '', [{ mimeType, content }])
+      setPendingImage({ mimeType, content, dataUrl })
+      textareaRef.current?.focus()
     } else {
       import('./Toast').then(m => m.showToast('图片格式错误', 'error'))
     }
-  }, [input, sendMessage, setInput])
+  }, [])
 
   useEffect(() => {
     (window as unknown as Record<string, unknown>).__lilclaw_onImagePicked = (dataUrl: string) => {
@@ -278,7 +278,8 @@ export default function ChatScreen() {
   const handleSubmit = useCallback((e: FormEvent) => {
     e.preventDefault()
     const trimmed = input.trim()
-    if (!trimmed) return
+    const hasImage = !!pendingImage
+    if (!trimmed && !hasImage) return
     setInput('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
 
@@ -289,9 +290,15 @@ export default function ChatScreen() {
       setActiveAction(null)
     }
 
-    sendMessage(finalMessage)
+    if (hasImage) {
+      const img = pendingImage!
+      setPendingImage(null)
+      sendMessage(finalMessage || '', [{ mimeType: img.mimeType, content: img.content }])
+    } else {
+      sendMessage(finalMessage)
+    }
     haptic('light')
-  }, [input, sendMessage, activeAction])
+  }, [input, sendMessage, activeAction, pendingImage])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -470,6 +477,27 @@ export default function ChatScreen() {
           </div>
         )}
 
+        {/* Pending image preview */}
+        {pendingImage && (
+          <div className="flex items-center gap-2 px-3 pt-2 pb-0">
+            <div className="relative inline-block">
+              <img
+                src={pendingImage.dataUrl}
+                alt="待发送"
+                className="h-16 rounded-lg object-cover border border-gray-200 dark:border-gray-700"
+              />
+              <button
+                type="button"
+                onClick={() => setPendingImage(null)}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 flex items-center justify-center rounded-full bg-gray-800/80 text-white text-xs"
+              >
+                ✕
+              </button>
+            </div>
+            <span className="text-[12px] text-gray-400 dark:text-gray-500">可输入描述后发送</span>
+          </div>
+        )}
+
         <div className="flex items-end gap-2 px-3 py-2.5">
           {/* Attachment button */}
           <button
@@ -511,7 +539,7 @@ export default function ChatScreen() {
                 <rect x="6" y="6" width="12" height="12" rx="2" />
               </svg>
             </button>
-          ) : input.trim() ? (
+          ) : (input.trim() || pendingImage) ? (
             <button
               type="submit"
               onMouseDown={(e) => e.preventDefault()}
