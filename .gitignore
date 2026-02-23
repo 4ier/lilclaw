@@ -37,3 +37,4 @@ app/src/main/assets/rootfs/*.bin
 app/src/main/assets/rootfs/*.tar.gz
 icon-paw-v1.png
 screen_*.png
+assets/

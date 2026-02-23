@@ -4,7 +4,7 @@
       "name": "base",
       "file": "base-arm64-2.0.0.tar.gz",
       "version": "2.0.0",
-      "size": 33380716
+      "size": 42713180
     },
     {
       "name": "openclaw",
@@ -16,13 +16,13 @@
       "name": "chatspa",
       "file": "chatspa-0.7.0.tar.gz",
       "version": "0.7.0",
-      "size": 250000
+      "size": 250034
     },
     {
       "name": "config",
-      "file": "config-0.1.0.tar.gz",
-      "version": "0.1.0",
-      "size": 2052
+      "file": "config-0.2.0.tar.gz",
+      "version": "0.2.0",
+      "size": 2815
     }
   ]
 }
