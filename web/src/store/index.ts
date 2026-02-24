@@ -150,6 +150,26 @@ export const useStore = create<AppState>()(
                 agentState: { ...state.agentState, [sessionKey]: event },
                 typing: { ...state.typing, [sessionKey]: false },
               }))
+              // On error or done, clear agentState after a short delay
+              if (event.kind === 'error') {
+                const errData = event.data as Record<string, unknown> | undefined
+                const errMsg = (errData?.message || errData?.error || '请求失败') as string
+                showToast(errMsg, 'error')
+                setTimeout(() => {
+                  set((state) => ({
+                    agentState: { ...state.agentState, [sessionKey]: null },
+                    typing: { ...state.typing, [sessionKey]: false },
+                    streaming: { ...state.streaming, [sessionKey]: { content: [], isStreaming: false } },
+                  }))
+                }, 3000)
+              } else if (event.kind === 'done') {
+                // Ensure clean state after done
+                setTimeout(() => {
+                  set((state) => ({
+                    agentState: { ...state.agentState, [sessionKey]: null },
+                  }))
+                }, 500)
+              }
             },
             onHistoryLoaded: (sessionKey, messages) => {
               // Server history replaces cached messages
@@ -280,6 +300,28 @@ export const useStore = create<AppState>()(
               }))
               return
             }
+            // Safety net: if no response arrives within 15s, assume error and clear state
+            // Gateway may silently fail (e.g. invalid API key) without sending any WS events
+            const sentSessionKey = currentSessionKey
+            const sentAt = Date.now()
+            const checkStuck = () => {
+              const s = get()
+              if (!s.typing[sentSessionKey] && !s.streaming[sentSessionKey]?.isStreaming) return // already resolved
+              // If no new messages arrived since we sent, it's likely an error
+              const msgs = s.messages[sentSessionKey] || []
+              const lastMsg = msgs[msgs.length - 1]
+              const hasNewResponse = lastMsg && lastMsg.role === 'assistant' && (lastMsg.timestamp || 0) > sentAt
+              if (hasNewResponse) return // got a response, all good
+              if (s.streaming[sentSessionKey]?.isStreaming) return // streaming in progress
+              // Still stuck — clear it
+              set((state) => ({
+                typing: { ...state.typing, [sentSessionKey]: false },
+                agentState: { ...state.agentState, [sentSessionKey]: null },
+                streaming: { ...state.streaming, [sentSessionKey]: { content: [], isStreaming: false } },
+              }))
+              import('../components/Toast').then(m => m.showToast('请求超时，请重试', 'error'))
+            }
+            setTimeout(checkStuck, 15_000)
           } else {
             // Offline: queue for later
             set((state) => ({
