@@ -106,6 +106,11 @@ fun WebViewScreen(
                 isHorizontalScrollBarEnabled = false
                 overScrollMode = WebView.OVER_SCROLL_NEVER
 
+                // Disable WebView's default long-press context menu (Copy/Share/Select All)
+                // while preserving native text selection (long-press → drag → copy bar).
+                isLongClickable = false
+                setOnLongClickListener { true }
+
                 val isDark = (ctx.resources.configuration.uiMode
                     and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
                     android.content.res.Configuration.UI_MODE_NIGHT_YES

@@ -38,16 +38,19 @@
 
 @layer components {
   .message-bubble {
-    @apply px-3.5 py-2.5;
+    @apply px-4 py-2.5;
     border-radius: 18px;
-    max-width: 88%;
     font-size: 1rem;
     line-height: 1.6;
+    width: fit-content;
+    min-width: 3.5rem;
+    max-width: 100%; /* respect parent's max-w-[88%] */
   }
 
   .message-bubble-user {
     @apply bg-amber-800 text-white;
     border-bottom-right-radius: 6px;
+    align-self: flex-end;
   }
 
   .message-bubble-assistant {
@@ -413,9 +416,15 @@
   height: 2px;
 }
 
-/* Hide textarea scrollbar */
+/* Hide textarea scrollbar — all browsers */
+textarea {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
 textarea::-webkit-scrollbar {
-  display: none;
+  display: none; /* Chrome/Safari/Android WebView */
+  width: 0;
+  height: 0;
 }
 
 .prose-chat pre::-webkit-scrollbar-track {

@@ -159,8 +159,6 @@ export default function MessageBubble({
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const bubbleRef = useRef<HTMLDivElement>(null)
   const deleteMessage = useStore((s) => s.deleteMessage)
 
@@ -171,30 +169,11 @@ export default function MessageBubble({
 
   const images = content.filter((c) => c.type === 'image' && c.url)
 
-  // Long-press detection
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    const touch = e.touches[0]
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY }
-    longPressTimerRef.current = setTimeout(() => {
-      setContextMenu({ x: touch.clientX, y: touch.clientY })
-    }, 500)
-  }, [])
+  // Long-press context menu removed (Option A):
+  // Let native text selection handle long-press. Copy/Retry/Delete
+  // are available as action buttons below the bubble.
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchStartRef.current) return
-    const touch = e.touches[0]
-    const dx = Math.abs(touch.clientX - touchStartRef.current.x)
-    const dy = Math.abs(touch.clientY - touchStartRef.current.y)
-    if (dx > 10 || dy > 10) {
-      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
-    }
-  }, [])
-
-  const handleTouchEnd = useCallback(() => {
-    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
-  }, [])
-
-  // Right-click context menu (desktop)
+  // Right-click context menu (desktop only)
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY })
@@ -239,15 +218,12 @@ export default function MessageBubble({
       <div
         className={`flex ${isUser ? 'justify-end' : 'justify-start'} ${animate ? 'animate-message-in' : ''}`}
       >
-        <div className="flex flex-col max-w-[88%]">
+        <div className="flex flex-col max-w-[92%]">
           <div
             ref={bubbleRef}
             className={`message-bubble ${isUser ? 'message-bubble-user' : 'message-bubble-assistant'}`}
             onClick={handleTap}
             onContextMenu={handleContextMenu}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
           >
             {images.map((img, i) => (
               <img
