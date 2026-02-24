@@ -151,15 +151,27 @@ class RootfsManager(private val context: Context) {
      * Returns layers whose installed version doesn't match the latest manifest.
      */
     suspend fun getStaleLayers(log: (String) -> Unit): List<LayerInfo> {
-        val latest = fetchManifestLayers(log) ?: FALLBACK_LAYERS
-        if (!layersJson.exists()) return latest
+        val latest = fetchManifestLayers(log) ?: run {
+            Log.i(TAG, "getStaleLayers: manifest unavailable, skipping update check")
+            return emptyList()  // Don't use FALLBACK_LAYERS for update comparison
+        }
+        if (!layersJson.exists()) {
+            Log.i(TAG, "getStaleLayers: no .layers.json, all layers stale")
+            return latest
+        }
         return try {
             val installed = JSONObject(layersJson.readText())
-            latest.filter { layer ->
+            val stale = latest.filter { layer ->
                 val obj = installed.optJSONObject(layer.name)
-                obj == null || obj.optString("version") != layer.version
+                val installedVersion = obj?.optString("version")
+                val isStale = obj == null || installedVersion != layer.version
+                if (isStale) Log.i(TAG, "Layer ${layer.name}: installed=$installedVersion → latest=${layer.version}")
+                isStale
             }
+            if (stale.isEmpty()) Log.i(TAG, "All layers up to date")
+            stale
         } catch (e: Exception) {
+            Log.w(TAG, "Failed to read .layers.json: ${e.message}")
             latest
         }
     }
@@ -199,14 +211,43 @@ class RootfsManager(private val context: Context) {
 
     private suspend fun fetchManifestLayers(log: (String) -> Unit): List<LayerInfo>? = withContext(Dispatchers.IO) {
         try {
-            val url = URL(MANIFEST_URL)
-            val conn = url.openConnection() as HttpURLConnection
-            conn.connectTimeout = 10_000
-            conn.readTimeout = 10_000
-            conn.instanceFollowRedirects = true
+            Log.i(TAG, "Fetching manifest from $MANIFEST_URL")
+            // GitHub releases return 302 → objects.githubusercontent.com.
+            // HttpURLConnection.instanceFollowRedirects doesn't always work on Android,
+            // so we handle redirects manually (same as downloadFile).
+            var currentUrl = URL(MANIFEST_URL)
+            var redirectCount = 0
+            var connection: HttpURLConnection? = null
+
+            while (redirectCount < 5) {
+                connection = (currentUrl.openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15_000
+                    readTimeout = 30_000
+                    instanceFollowRedirects = false
+                }
+                val code = connection.responseCode
+                Log.i(TAG, "Manifest fetch: $currentUrl → $code")
+                if (code in 301..302 || code == 307 || code == 308) {
+                    val location = connection.getHeaderField("Location")
+                    connection.disconnect()
+                    if (location == null) {
+                        Log.w(TAG, "Redirect without Location header")
+                        return@withContext null
+                    }
+                    currentUrl = URL(location)
+                    redirectCount++
+                    continue
+                }
+                break
+            }
+
             try {
-                if (conn.responseCode != 200) return@withContext null
-                val text = conn.inputStream.bufferedReader().readText()
+                val code = connection?.responseCode ?: -1
+                if (code != 200) {
+                    Log.w(TAG, "Manifest fetch failed: HTTP $code")
+                    return@withContext null
+                }
+                val text = connection!!.inputStream.bufferedReader().readText()
                 val json = JSONObject(text)
                 val arr = json.getJSONArray("layers")
                 val layers = mutableListOf<LayerInfo>()
@@ -223,13 +264,15 @@ class RootfsManager(private val context: Context) {
                         )
                     )
                 }
+                Log.i(TAG, "Manifest OK: ${layers.joinToString { "${it.name}@${it.version}" }}")
                 log("Manifest: ${layers.joinToString { "${it.name}@${it.version}" }}")
                 layers
             } finally {
-                conn.disconnect()
+                connection?.disconnect()
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to fetch manifest: ${e.message}")
+            Log.w(TAG, "Failed to fetch manifest: ${e.message}", e)
+            log("Manifest 获取失败: ${e.message}")
             null
         }
     }
