@@ -11,8 +11,7 @@ android {
     defaultConfig {
         applicationId = "com.lilclaw.app"
         minSdk = 26
-        //noinspection OldTargetApi — targetSdk 28 required for proot execve (W^X exemption)
-        targetSdk = 28
+        targetSdk = 35
         versionCode = 74
         versionName = "0.7.4"
 
