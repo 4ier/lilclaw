@@ -41,3 +41,7 @@ screen_*.png
 assets/*
 !assets/SOUL.md
 !assets/TOOLS.md
+
+# Signing
+keystore/
+keystore.properties
