@@ -4,8 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>小爪 LilClaw — 口袋 AI Gateway</title>
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="description" content="OpenClaw on Android. 安装即用，无需 root，本地运行 AI。">
+<meta property="og:title" content="小爪 LilClaw — 口袋 AI Gateway">
+<meta property="og:description" content="OpenClaw on Android. 安装即用，无需 root，本地运行 AI。">
+<meta property="og:image" content="https://4ier.github.io/lilclaw/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -49,10 +53,12 @@
     pointer-events: none;
   }
 
-  .logo {
-    font-size: 4rem;
-    margin-bottom: 0.5rem;
-    filter: drop-shadow(0 0 24px rgba(255,107,53,0.3));
+  .app-icon {
+    width: 120px;
+    height: 120px;
+    border-radius: 28px;
+    margin-bottom: 1.5rem;
+    filter: drop-shadow(0 8px 32px rgba(255,107,53,0.3));
   }
   h1 {
     font-size: 2.8rem;
@@ -95,6 +101,33 @@
   .cta-size {
     font-size: 0.75rem;
     color: var(--dim);
+  }
+
+  /* Screenshots */
+  .screenshots {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 2rem 3rem;
+    text-align: center;
+  }
+  .screenshots h2 {
+    font-size: 1.2rem;
+    color: var(--dim);
+    margin-bottom: 1.5rem;
+    font-weight: 400;
+  }
+  .screenshot-grid {
+    display: flex;
+    gap: 1.2rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .screenshot-grid img {
+    height: 420px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    object-fit: cover;
   }
 
   .features {
@@ -152,27 +185,40 @@
 
   @media (max-width: 480px) {
     h1 { font-size: 2rem; }
-    .logo { font-size: 3rem; }
+    .app-icon { width: 88px; height: 88px; border-radius: 20px; }
     .tagline { font-size: 1rem; }
     .features { grid-template-columns: 1fr; }
+    .screenshot-grid img { height: 320px; }
   }
 </style>
 </head>
 <body>
 
 <section class="hero">
-  <div class="logo">🦞</div>
+  <img class="app-icon" src="icon.png" alt="小爪 App Icon">
   <h1><span>小爪</span> LilClaw</h1>
   <p class="subtitle">OpenClaw on Android — Pocket AI Gateway</p>
   <p class="tagline">
-    一只龙虾住进了你的手机。<br>
-    安装即用，无需 root，本地运行 AI。
+    安装即用，无需 root，本地运行 AI。<br>
+    对话数据不经过第三方服务器。
   </p>
   <a class="cta" href="https://github.com/4ier/lilclaw/releases/latest" target="_blank">
     ⬇ 下载 APK
   </a>
   <span class="cta-size">v0.7.4 · ~95MB</span>
 </section>
+
+<!-- Screenshots section — add images to docs/screenshots/ -->
+<!--
+<section class="screenshots">
+  <h2>截图</h2>
+  <div class="screenshot-grid">
+    <img src="screenshots/chat.png" alt="聊天界面">
+    <img src="screenshots/setup.png" alt="设置页面">
+    <img src="screenshots/voice.png" alt="语音输入">
+  </div>
+</section>
+-->
 
 <div class="features">
   <div class="card">
