@@ -25,6 +25,7 @@ object ConfigWriter {
         provider: String,
         apiKey: String,
         model: String,
+        baseUrl: String = "",
     ) {
         val configDir = File(rootfsDir, "root/.openclaw")
         configDir.mkdirs()
@@ -40,7 +41,7 @@ object ConfigWriter {
                 put("native", "auto")
                 put("nativeSkills", "auto")
             })
-            putProviderEnv(this, providerSlug, apiKey)
+            putProviderEnv(this, providerSlug, apiKey, baseUrl)
         }
 
         configFile.writeText(config.toString(2))
@@ -115,25 +116,27 @@ object ConfigWriter {
         })
     }
 
-    private fun putProviderEnv(config: JSONObject, providerSlug: String, apiKey: String) {
+    private fun putProviderEnv(config: JSONObject, providerSlug: String, apiKey: String, baseUrl: String) {
         when (providerSlug) {
-            "openai" -> {
+            "openai" -> config.put("env", JSONObject().apply {
+                put("OPENAI_API_KEY", apiKey)
+                if (baseUrl.isNotBlank()) put("OPENAI_BASE_URL", baseUrl)
+            })
+            "anthropic" -> config.put("env", JSONObject().apply {
+                put("ANTHROPIC_API_KEY", apiKey)
+            })
+            "deepseek" -> config.put("models", buildDeepSeekModels(apiKey, baseUrl))
+            else -> {
                 config.put("env", JSONObject().apply { put("OPENAI_API_KEY", apiKey) })
-            }
-            "anthropic" -> {
-                config.put("env", JSONObject().apply { put("ANTHROPIC_API_KEY", apiKey) })
-            }
-            "deepseek" -> {
-                config.put("models", buildDeepSeekModels(apiKey))
             }
         }
     }
 
-    private fun buildDeepSeekModels(apiKey: String) = JSONObject().apply {
+    private fun buildDeepSeekModels(apiKey: String, baseUrl: String) = JSONObject().apply {
         put("mode", "merge")
         put("providers", JSONObject().apply {
             put("deepseek", JSONObject().apply {
-                put("baseUrl", "https://api.deepseek.com/v1")
+                put("baseUrl", baseUrl.ifBlank { "https://api.deepseek.com/v1" })
                 put("apiKey", apiKey)
                 put("api", "openai-completions")
                 put("models", JSONArray().apply {
